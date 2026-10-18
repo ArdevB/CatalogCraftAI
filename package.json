@@ -1,0 +1,34 @@
+{
+  "name": "catalogcraft-ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Multi-tenant SaaS for cleaning, enriching, reviewing and exporting ecommerce catalogues.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "workspaces": [
+    "packages/shared",
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "build:shared": "npm run build -w @catalogcraft/shared",
+    "dev": "npm run build:shared && concurrently -n shared,api,web -c blue,green,magenta \"npm run dev -w @catalogcraft/shared\" \"npm run dev -w @catalogcraft/api\" \"npm run dev -w @catalogcraft/web\"",
+    "build": "npm run build:shared && npm run build -w @catalogcraft/api && npm run build -w @catalogcraft/web",
+    "start": "npm run start -w @catalogcraft/api",
+    "lint": "eslint .",
+    "typecheck": "npm run build:shared && npm run typecheck --workspaces",
+    "test": "npm run build:shared && npm run test --workspaces",
+    "check": "npm run lint && npm run typecheck && npm run test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "concurrently": "^10.0.6",
+    "eslint": "^10.13.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.2"
+  }
+}
