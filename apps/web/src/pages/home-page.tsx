@@ -1,3 +1,6 @@
+import { Link } from 'react-router';
+import { Button } from '@/components/ui/button';
+import { useSession } from '@/features/auth/use-session';
 import { SystemStatusCard } from '@/features/system/system-status-card';
 
 const WORKFLOW = [
@@ -8,6 +11,27 @@ const WORKFLOW = [
   { step: 'Export', text: 'Download a clean CSV with protected values left untouched.' },
 ];
 
+function CallToAction() {
+  const session = useSession();
+  if (session.data) {
+    return (
+      <Button asChild>
+        <Link to="/dashboard">Go to dashboard</Link>
+      </Button>
+    );
+  }
+  return (
+    <div className="flex flex-wrap gap-3">
+      <Button asChild>
+        <Link to="/register">Create an account</Link>
+      </Button>
+      <Button asChild variant="outline">
+        <Link to="/login">Sign in</Link>
+      </Button>
+    </div>
+  );
+}
+
 export function HomePage() {
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_380px]">
@@ -17,10 +41,10 @@ export function HomePage() {
             Clean, enrich, review and export ecommerce catalogues in bulk.
           </h1>
           <p className="max-w-2xl text-muted-foreground text-pretty">
-            Product facts stay preserved, and every AI-generated change stays under your control. Sign-in and client
-            workspaces arrive in the next milestone.
+            Product facts stay preserved, and every AI-generated change stays under your control.
           </p>
         </div>
+        <CallToAction />
 
         <ol className="grid gap-3 sm:grid-cols-2">
           {WORKFLOW.map(({ step, text }, index) => (

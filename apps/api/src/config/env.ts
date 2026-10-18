@@ -1,3 +1,5 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
 /**
@@ -38,7 +40,23 @@ const envSchema = z.object({
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(15 * 60 * 1000),
   RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(300),
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
+
+  SESSION_SECRET: z
+    .string({ error: 'SESSION_SECRET is required (see .env.example for how to generate one).' })
+    .min(32, 'SESSION_SECRET must be at least 32 characters. Generate one as shown in .env.example.')
+    .refine((value) => !value.includes('<') && !value.includes('change-me'), {
+      error: 'SESSION_SECRET still contains the placeholder from .env.example. Generate a real one.',
+    }),
+  SESSION_TTL_HOURS: z.coerce.number().min(1).max(24 * 30).default(72),
+
+  STORAGE_LOCAL_DIR: z.string().trim().min(1).default('./storage'),
+  UPLOAD_MAX_MB: z.coerce.number().min(1).max(50).default(10),
+  IMPORT_MAX_ROWS: z.coerce.number().int().min(1).max(50_000).default(2_000),
 });
+
+/** Repository root (this file lives in apps/api/{src,dist}/config). */
+const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 
 export type AppConfig = Readonly<{
   nodeEnv: z.infer<typeof envSchema>['NODE_ENV'];
@@ -48,7 +66,11 @@ export type AppConfig = Readonly<{
   mongodbUri: string;
   webOrigins: readonly string[];
   trustProxyHops: number;
-  rateLimit: Readonly<{ windowMs: number; max: number }>;
+  rateLimit: Readonly<{ windowMs: number; max: number; authMax: number }>;
+  session: Readonly<{ secret: string; ttlMs: number }>;
+  /** Absolute directory for private files (uploads, exports). Never served directly. */
+  storageDir: string;
+  imports: Readonly<{ maxUploadBytes: number; maxRows: number }>;
 }>;
 
 export class ConfigError extends Error {
@@ -78,6 +100,13 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     mongodbUri: env.MONGODB_URI,
     webOrigins: Object.freeze([...env.WEB_ORIGIN]),
     trustProxyHops: env.TRUST_PROXY_HOPS,
-    rateLimit: Object.freeze({ windowMs: env.RATE_LIMIT_WINDOW_MS, max: env.RATE_LIMIT_MAX }),
+    rateLimit: Object.freeze({
+      windowMs: env.RATE_LIMIT_WINDOW_MS,
+      max: env.RATE_LIMIT_MAX,
+      authMax: env.AUTH_RATE_LIMIT_MAX,
+    }),
+    session: Object.freeze({ secret: env.SESSION_SECRET, ttlMs: env.SESSION_TTL_HOURS * 60 * 60 * 1000 }),
+    storageDir: path.resolve(REPO_ROOT, env.STORAGE_LOCAL_DIR),
+    imports: Object.freeze({ maxUploadBytes: Math.round(env.UPLOAD_MAX_MB * 1024 * 1024), maxRows: env.IMPORT_MAX_ROWS }),
   });
 }

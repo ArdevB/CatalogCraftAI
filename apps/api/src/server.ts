@@ -1,14 +1,13 @@
-import { existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { MongoStore } from 'connect-mongo';
+import mongoose from 'mongoose';
 import { createApp } from './app.js';
 import { connectWithRetry, disconnectDatabase } from './config/database.js';
 import { ConfigError, loadConfig, type AppConfig } from './config/env.js';
+import { loadRootEnvFile } from './config/load-env-file.js';
 import { createLogger } from './config/logger.js';
+import { LocalFileStorage } from './services/storage/storage.js';
 
-// Load the repository-root `.env` in local development. In production, the
-// hosting platform injects environment variables directly and no file exists.
-const rootEnvFile = fileURLToPath(new URL('../../../.env', import.meta.url));
-if (existsSync(rootEnvFile)) process.loadEnvFile(rootEnvFile);
+loadRootEnvFile();
 
 function loadConfigOrExit(): AppConfig {
   try {
@@ -24,8 +23,22 @@ function loadConfigOrExit(): AppConfig {
 
 const config = loadConfigOrExit();
 const logger = createLogger(config);
-const app = createApp({ config, logger });
 const shutdownController = new AbortController();
+
+const connected = connectWithRetry(config.mongodbUri, logger, shutdownController.signal);
+
+// Sessions share Mongoose's MongoDB connection instead of opening a second one.
+// Until the database connects, requests that need sessions get a 503 anyway.
+const sessionStore = MongoStore.create({
+  clientPromise: connected.then(() => mongoose.connection.getClient()),
+  collectionName: 'sessions',
+  ttl: config.session.ttlMs / 1000,
+  // Write the expiry back to MongoDB at most every 5 minutes, not on every request.
+  touchAfter: 5 * 60,
+});
+
+const storage = new LocalFileStorage(config.storageDir);
+const app = createApp({ config, logger, sessionStore, storage });
 
 const server = app.listen(config.port, () => {
   logger.info(`API listening on http://localhost:${config.port}/api/v1 (${config.nodeEnv})`);
@@ -35,8 +48,6 @@ server.on('error', (error) => {
   logger.fatal({ err: error }, `Could not start the HTTP server on port ${config.port}.`);
   process.exit(1);
 });
-
-void connectWithRetry(config.mongodbUri, logger, shutdownController.signal);
 
 /** Stop accepting requests, let in-flight ones finish, then close MongoDB. */
 async function shutdown(signal: string): Promise<void> {

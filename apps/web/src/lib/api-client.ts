@@ -2,6 +2,8 @@ import { z } from 'zod';
 import {
   apiErrorResponseSchema,
   apiSuccessResponseSchema,
+  CSRF_HEADER,
+  CSRF_HEADER_VALUE,
   type ErrorCode,
   type ValidationIssueDetail,
 } from '@catalogcraft/shared';
@@ -30,6 +32,10 @@ export class ApiError extends Error {
   }
 }
 
+export function isUnauthenticated(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'UNAUTHENTICATED';
+}
+
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
@@ -48,6 +54,8 @@ export async function apiRequest<T extends z.ZodType>(
   dataSchema: T,
   { method = 'GET', body, signal }: RequestOptions = {},
 ): Promise<z.infer<T>> {
+  // FormData (file uploads) is sent as multipart; the browser sets its Content-Type and boundary.
+  const isForm = body instanceof FormData;
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
@@ -56,9 +64,11 @@ export async function apiRequest<T extends z.ZodType>(
       credentials: 'include',
       headers: {
         Accept: 'application/json',
-        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        // Anti-forgery header; the API rejects state-changing requests without it.
+        [CSRF_HEADER]: CSRF_HEADER_VALUE,
+        ...(body === undefined || isForm ? {} : { 'Content-Type': 'application/json' }),
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error;

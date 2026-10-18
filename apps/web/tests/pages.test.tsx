@@ -2,7 +2,15 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { SystemStatusCard } from '@/features/system/system-status-card';
-import { healthBody, jsonResponse, mockFetch, renderRoute, renderWithQuery } from './utils';
+import {
+  healthBody,
+  jsonResponse,
+  mockApi,
+  mockFetch,
+  renderRoute,
+  renderWithQuery,
+  unauthenticated,
+} from './utils';
 
 describe('SystemStatusCard', () => {
   it('shows a loading state, then the live API and database status', async () => {
@@ -37,11 +45,13 @@ describe('SystemStatusCard', () => {
 });
 
 describe('routing', () => {
-  it('renders the home page at /', async () => {
-    mockFetch(jsonResponse(healthBody()));
+  it('renders the landing page at / with sign-in options for visitors', async () => {
+    mockApi({ 'GET /health': () => jsonResponse(healthBody()), 'GET /me': unauthenticated });
     renderRoute('/');
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/clean, enrich, review and export/i);
+    expect(await screen.findByRole('link', { name: 'Create an account' })).toHaveAttribute('href', '/register');
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login');
     expect(await screen.findByText('Online')).toBeInTheDocument();
   });
 

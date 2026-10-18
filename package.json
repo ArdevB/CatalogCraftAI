@@ -20,7 +20,9 @@
     "lint": "eslint .",
     "typecheck": "npm run build:shared && npm run typecheck --workspaces",
     "test": "npm run build:shared && npm run test --workspaces",
-    "check": "npm run lint && npm run typecheck && npm run test"
+    "check": "npm run lint && npm run typecheck && npm run test",
+    "seed": "npm run seed -w @catalogcraft/api",
+    "set-plan": "npm run set-plan -w @catalogcraft/api --"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -30,5 +32,10 @@
     "globals": "^17.13.0",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.71.2"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
   }
 }

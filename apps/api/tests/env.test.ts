@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { ConfigError, loadConfig } from '../src/config/env.js';
 
-const base = { MONGODB_URI: 'mongodb://127.0.0.1:27017/catalogcraft' };
+const SESSION_SECRET = 'x'.repeat(40);
+const base = { MONGODB_URI: 'mongodb://127.0.0.1:27017/catalogcraft', SESSION_SECRET };
 
 describe('loadConfig', () => {
   it('applies safe defaults', () => {
@@ -21,7 +22,7 @@ describe('loadConfig', () => {
   });
 
   it('accepts MongoDB Atlas SRV URIs', () => {
-    expect(() => loadConfig({ MONGODB_URI: 'mongodb+srv://user:pass@cluster0.example.net/db' })).not.toThrow();
+    expect(() => loadConfig({ MONGODB_URI: 'mongodb+srv://user:pass@cluster0.example.net/db', SESSION_SECRET })).not.toThrow();
   });
 
   it('treats empty values as unset', () => {
@@ -46,6 +47,18 @@ describe('loadConfig', () => {
       loadConfig({ MONGODB_URI: 'MONGODB_URI=mongodb+srv://user:hunter2@cluster0.example.net/db' });
     expect(attempt).toThrow('yours starts with "MONGODB_URI=mongodb+srv://…"');
     expect(attempt).not.toThrow(/hunter2/);
+  });
+
+  it('requires a real, long SESSION_SECRET', () => {
+    expect(() => loadConfig({ MONGODB_URI: base.MONGODB_URI })).toThrow(/SESSION_SECRET is required/);
+    expect(() => loadConfig({ ...base, SESSION_SECRET: 'too-short' })).toThrow(/at least 32/);
+    expect(() => loadConfig({ ...base, SESSION_SECRET: '<generate-a-random-secret>-padding-padding' })).toThrow(
+      /placeholder/,
+    );
+  });
+
+  it('converts the session lifetime to milliseconds', () => {
+    expect(loadConfig({ ...base, SESSION_TTL_HOURS: '2' }).session.ttlMs).toBe(2 * 60 * 60 * 1000);
   });
 
   it('requires MONGODB_URI', () => {

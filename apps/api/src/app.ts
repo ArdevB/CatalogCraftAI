@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import express, { type Express } from 'express';
+import type { Store } from 'express-session';
 import { pinoHttp } from 'pino-http';
 import type { Logger } from 'pino';
 import type { DatabaseStatus } from '@catalogcraft/shared';
@@ -8,10 +9,15 @@ import { getDatabaseStatus as mongooseDatabaseStatus } from './config/database.j
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { apiRateLimit, corsPolicy, securityHeaders } from './middleware/security.js';
 import { apiV1Router } from './routes.js';
+import type { FileStorage } from './services/storage/storage.js';
 
 export type AppDependencies = {
   config: AppConfig;
   logger: Logger;
+  /** Where sessions are stored: MongoDB in real use, injectable for tests. */
+  sessionStore: Store;
+  /** Private file storage for uploads and exports. */
+  storage: FileStorage;
   /** Injectable so tests can simulate a connected or disconnected database. */
   getDatabaseStatus?: () => DatabaseStatus;
 };
@@ -21,7 +27,13 @@ export type AppDependencies = {
  * separate from `server.ts` lets tests exercise the full middleware stack
  * in-memory with Supertest.
  */
-export function createApp({ config, logger, getDatabaseStatus = mongooseDatabaseStatus }: AppDependencies): Express {
+export function createApp({
+  config,
+  logger,
+  sessionStore,
+  storage,
+  getDatabaseStatus = mongooseDatabaseStatus,
+}: AppDependencies): Express {
   const app = express();
 
   app.disable('x-powered-by');
@@ -45,7 +57,7 @@ export function createApp({ config, logger, getDatabaseStatus = mongooseDatabase
   app.use(express.json({ limit: '1mb' }));
 
   app.use('/api', apiRateLimit(config));
-  app.use('/api/v1', apiV1Router({ config, getDatabaseStatus }));
+  app.use('/api/v1', apiV1Router({ config, getDatabaseStatus, sessionStore, storage }));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

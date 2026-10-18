@@ -1,15 +1,18 @@
 import { Link, Outlet } from 'react-router';
 
-export function BrandMark() {
+export function BrandMark({ to = '/' }: { to?: string }) {
   return (
-    <Link to="/" className="flex items-center gap-2 rounded-md font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-ring">
+    <Link
+      to={to}
+      className="flex shrink-0 items-center gap-2 rounded-md font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-ring"
+    >
       <img src="/favicon.svg" alt="" className="size-6" />
       CatalogCraft AI
     </Link>
   );
 }
 
-/** Top-level shell. Navigation links are added as their pages are built. */
+/** Shell for public pages (landing, sign-in, registration). */
 export function AppLayout() {
   return (
     <div className="flex min-h-svh flex-col">

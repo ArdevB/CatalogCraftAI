@@ -9,6 +9,11 @@ import type { DatabaseStatus } from '@catalogcraft/shared';
  */
 mongoose.set('bufferCommands', false);
 mongoose.set('strictQuery', true);
+// With buffering off, Mongoose's automatic index build would run before the
+// connection exists and fail silently. We build indexes explicitly instead,
+// right after connecting (see `ensureIndexes`).
+mongoose.set('autoCreate', false);
+mongoose.set('autoIndex', false);
 
 const RETRY_DELAY_MS = 5_000;
 
@@ -23,6 +28,15 @@ export function getDatabaseStatus(): DatabaseStatus {
     default:
       return 'disconnected';
   }
+}
+
+/**
+ * Creates every index declared on the registered models (unique emails,
+ * one membership per user per organization, tenant lookups…). Safe to run on
+ * every start: existing indexes are left as they are.
+ */
+export async function ensureIndexes(): Promise<void> {
+  await Promise.all(Object.values(mongoose.models).map((model) => model.createIndexes()));
 }
 
 /** Hides credentials when a URI has to appear in logs. */
@@ -48,6 +62,13 @@ export async function connectWithRetry(uri: string, logger: Logger, signal?: Abo
     try {
       await mongoose.connect(uri, { serverSelectionTimeoutMS: 5_000 });
       logger.info({ uri: redactMongoUri(uri) }, 'MongoDB connected');
+      try {
+        await ensureIndexes();
+      } catch (error) {
+        // Usually means existing data violates a unique index. The API keeps
+        // running, but uniqueness is not guaranteed until the data is fixed.
+        logger.error({ err: error }, 'Failed to create MongoDB indexes');
+      }
       return;
     } catch (error) {
       logger.error(

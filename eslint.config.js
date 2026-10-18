@@ -26,6 +26,11 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
+    // Command-line scripts talk to the developer through the console.
+    files: ['apps/api/src/scripts/**/*.ts'],
+    rules: { 'no-console': 'off' },
+  },
+  {
     files: ['apps/web/**/*.{ts,tsx}'],
     languageOptions: { globals: globals.browser },
     plugins: { 'react-hooks': reactHooks },
