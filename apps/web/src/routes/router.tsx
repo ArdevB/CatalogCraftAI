@@ -10,6 +10,7 @@ import { DashboardPage } from '@/pages/dashboard-page';
 import { JobPage } from '@/pages/jobs/job-page';
 import { JobsListPage } from '@/pages/jobs/jobs-list-page';
 import { HomePage } from '@/pages/home-page';
+import { InvitePage } from '@/pages/invite-page';
 import { LoginPage } from '@/pages/login-page';
 import { NotFoundPage } from '@/pages/not-found-page';
 import { OrganizationSettingsPage } from '@/pages/organization-settings-page';
@@ -25,6 +26,8 @@ export const routes: RouteObject[] = [
         element: <AppLayout />,
         children: [
           { index: true, element: <HomePage /> },
+          // Works signed in or out, so it sits outside both guards.
+          { path: 'invite/:token', element: <InvitePage /> },
           {
             element: <RedirectIfAuthenticated />,
             children: [

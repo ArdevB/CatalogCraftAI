@@ -53,6 +53,8 @@ export const sessionInfoSchema = z.object({
   organization: organizationSchema,
   role: roleSchema,
   permissions: z.array(permissionSchema),
+  /** Every organization the user belongs to, for switching between agencies. */
+  organizations: z.array(z.object({ id: z.string(), name: z.string(), role: roleSchema })),
 });
 export type SessionInfo = z.infer<typeof sessionInfoSchema>;
 

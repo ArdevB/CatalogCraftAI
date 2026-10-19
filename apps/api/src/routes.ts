@@ -12,6 +12,7 @@ import { dashboardRouter } from './modules/dashboard/dashboard.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 import { exportsRouter, reviewRouter } from './modules/review/review.routes.js';
 import { organizationsRouter } from './modules/organizations/organization.routes.js';
+import { invitationsRouter, teamRouter } from './modules/team/team.routes.js';
 import { aiStatusRouter, enrichmentRouter, usageRouter } from './modules/enrichment/enrichment.routes.js';
 import type { AiProvider } from './services/ai/provider.js';
 import type { FileStorage } from './services/storage/storage.js';
@@ -43,6 +44,8 @@ export function apiV1Router(deps: RouteDependencies): Router {
   router.use('/auth', authRouter(deps.config));
   router.get('/me', meHandler);
   router.use('/organizations', organizationsRouter());
+  router.use('/organizations/current', teamRouter());
+  router.use('/invitations', invitationsRouter(deps.config));
   router.use('/clients', clientsRouter());
   router.use('/dashboard', dashboardRouter());
   router.use('/jobs', jobsRouter({ config: deps.config, storage: deps.storage }));

@@ -101,5 +101,11 @@ export const usageSummarySchema = z.object({
   /** Estimate from public list prices; `null` when the model's price is unknown. */
   estimatedCostUsd: z.number().nullable(),
   ai: z.object({ configured: z.boolean(), model: z.string().nullable() }),
+  /** Plan allowances (`limit: null` = unlimited). Members include pending invitations. */
+  limits: z.object({
+    clientWorkspaces: z.object({ used: z.number().int(), limit: z.number().int().nullable() }),
+    members: z.object({ used: z.number().int(), limit: z.number().int().nullable() }),
+    activeJobs: z.object({ used: z.number().int(), limit: z.number().int().nullable() }),
+  }),
 });
 export type UsageSummary = z.infer<typeof usageSummarySchema>;

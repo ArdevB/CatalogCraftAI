@@ -9,3 +9,4 @@ export * from './schemas/language.js';
 export * from './schemas/organization.js';
 export * from './schemas/review.js';
 export * from './schemas/roles.js';
+export * from './schemas/team.js';

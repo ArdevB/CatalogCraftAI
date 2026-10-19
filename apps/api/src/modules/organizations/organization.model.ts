@@ -8,6 +8,10 @@ const organizationSchema = new Schema(
     /** Plan limits are looked up from configuration by this id, never stored here. */
     plan: { type: String, enum: PLAN_IDS, required: true, default: 'trial' },
     subscriptionStatus: { type: String, enum: SUBSCRIPTION_STATUSES, required: true, default: 'trialing' },
+    /** Agency-wide rules applied to every client on top of its brand profile. */
+    contentRules: {
+      prohibitedClaims: { type: [String], default: [] },
+    },
   },
   { timestamps: true },
 );

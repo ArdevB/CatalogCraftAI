@@ -29,6 +29,7 @@ import '../src/modules/clients/client.model.js';
 import '../src/modules/usage/usage-event.model.js';
 import '../src/modules/audit/audit-log.model.js';
 import '../src/modules/exports/export.model.js';
+import '../src/modules/team/invitation.model.js';
 import { MembershipModel } from '../src/modules/memberships/membership.model.js';
 import { OrganizationModel } from '../src/modules/organizations/organization.model.js';
 
@@ -108,8 +109,8 @@ export async function newAgency(app: App, options: { plan?: PlanId } = {}) {
 }
 
 /**
- * There is no invitation flow yet, so tests add teammates directly in the
- * database and then sign in as them through the real login endpoint.
+ * A shortcut for tests that need a teammate but aren't about invitations:
+ * adds the membership directly, then signs in through the real login endpoint.
  */
 export async function addTeammate(app: App, organizationId: string, role: Role) {
   const other = await newAgency(app);
@@ -119,7 +120,7 @@ export async function addTeammate(app: App, organizationId: string, role: Role) 
 
   const client = browser(app);
   await client.post('/api/v1/auth/login').send({ email: other.input.email, password: other.input.password }).expect(200);
-  return { client, userId: other.userId };
+  return { client, userId: other.userId, email: other.input.email };
 }
 
 let counter = 0;

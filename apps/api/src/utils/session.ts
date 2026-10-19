@@ -20,3 +20,11 @@ export function destroySession(req: Request): Promise<void> {
   if (!req.session) return Promise.resolve();
   return new Promise((resolve, reject) => req.session.destroy((error) => (error ? reject(error) : resolve())));
 }
+
+/** Starts a fresh signed-in session (new id, defeating session fixation). */
+export async function startSession(req: Request, userId: string, organizationId: string): Promise<void> {
+  await regenerateSession(req);
+  req.session.userId = userId;
+  req.session.organizationId = organizationId;
+  await saveSession(req);
+}

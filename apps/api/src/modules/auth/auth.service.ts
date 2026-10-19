@@ -21,22 +21,7 @@ function isDuplicateKeyError(error: unknown): boolean {
  * later step fails, delete the earlier ones — no half-created accounts.
  */
 export async function registerAccount(input: RegisterInput): Promise<{ userId: string; organizationId: string }> {
-  if (await UserModel.exists({ email: input.email })) {
-    throw new AppError('CONFLICT', 'An account with this email already exists. Try signing in instead.');
-  }
-
-  const passwordHash = await hashPassword(input.password);
-
-  let user;
-  try {
-    user = await UserModel.create({ name: input.name, email: input.email, passwordHash });
-  } catch (error) {
-    // Two sign-ups with the same email at the same moment: the unique index wins.
-    if (isDuplicateKeyError(error)) {
-      throw new AppError('CONFLICT', 'An account with this email already exists. Try signing in instead.');
-    }
-    throw error;
-  }
+  const user = await createUser(input);
 
   let organizationId: string | undefined;
   try {
@@ -52,6 +37,23 @@ export async function registerAccount(input: RegisterInput): Promise<{ userId: s
   }
 
   return { userId: user._id.toString(), organizationId };
+}
+
+/** Creates a user with a hashed password, refusing emails that are already registered. */
+export async function createUser(input: { name: string; email: string; password: string }) {
+  if (await UserModel.exists({ email: input.email })) {
+    throw new AppError('CONFLICT', 'An account with this email already exists. Try signing in instead.');
+  }
+  const passwordHash = await hashPassword(input.password);
+  try {
+    return await UserModel.create({ name: input.name, email: input.email, passwordHash });
+  } catch (error) {
+    // Two sign-ups with the same email at the same moment: the unique index wins.
+    if (isDuplicateKeyError(error)) {
+      throw new AppError('CONFLICT', 'An account with this email already exists. Try signing in instead.');
+    }
+    throw error;
+  }
 }
 
 /** Returns the user id if the email/password pair is valid; otherwise throws a generic error. */
@@ -79,10 +81,22 @@ export async function buildSessionInfo(auth: AuthContext): Promise<SessionInfo> 
   if (!organization) {
     throw new AppError('UNAUTHENTICATED', 'Your organization no longer exists. Please sign in again.');
   }
+  const memberships = await MembershipModel.find({ userId: auth.userId }).sort({ createdAt: 1 }).lean();
+  const organizations = await OrganizationModel.find({ _id: { $in: memberships.map((m) => m.organizationId) } })
+    .select('name')
+    .lean();
+  const names = new Map(organizations.map((org) => [org._id.toString(), org.name]));
   return {
     user: auth.user,
     organization: toOrganizationDto(organization),
     role: auth.role,
     permissions: permissionsForRole(auth.role),
+    organizations: memberships
+      .filter((membership) => names.has(membership.organizationId.toString()))
+      .map((membership) => ({
+        id: membership.organizationId.toString(),
+        name: names.get(membership.organizationId.toString())!,
+        role: membership.role,
+      })),
   };
 }

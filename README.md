@@ -2,7 +2,7 @@
 
 Multi-tenant SaaS for ecommerce agencies: import messy supplier catalogues (CSV/XLSX), validate them, generate AI suggestions for selected fields, review every change, and export a clean CSV — with product facts and protected fields (SKU, price, stock, barcodes…) never altered by AI.
 
-> **Status: Phase 4 (Review & export) complete — the full CSV workflow works end to end.** Import a supplier file, validate it, generate AI suggestions, review them (approve / edit / reject, bulk approve), and export a clean CSV with protected values untouched. Every review decision and export is audit-logged. Remaining: Phase 5–6 polish and pilot readiness — see [Roadmap](#roadmap).
+> **Status: Phase 5 (Agency workflow) complete.** The full CSV workflow works end to end — import a supplier file, validate it, generate AI suggestions, review them and export a clean CSV with protected values untouched — and agencies can now invite their team with one-time links, manage roles, switch between organizations and set content rules for every client. Remaining: Phase 6 pilot readiness — see [Roadmap](#roadmap).
 
 ---
 
@@ -138,8 +138,18 @@ State-changing requests (`POST`/`PUT`/`PATCH`/`DELETE`) must include the header 
 | POST | `/api/v1/auth/logout` | – | Deletes the session server-side and clears the cookie. |
 | GET | `/api/v1/me` | signed in | Current user, active organization, role and permissions. |
 | GET | `/api/v1/organizations/current` | `organization:read` | The active organization. |
-| PATCH | `/api/v1/organizations/current` | `organization:update` | `{ name }` — rename (owner, admin). |
+| POST | `/api/v1/auth/switch-organization` | signed in | `{ organizationId }` — switch the active organization. `404` unless you are a member. |
+| PATCH | `/api/v1/organizations/current` | `organization:update` | `{ name?, contentRules?: { prohibitedClaims } }` — rename, or set the agency-wide content rules (owner, admin). |
 | GET | `/api/v1/organizations/current/members` | `members:read` | Members and their roles. |
+| PATCH | `/api/v1/organizations/current/members/:membershipId` | `members:manage` | `{ role }` (admin/editor/reviewer). The owner and your own role can't be changed; only the owner grants or manages admins. |
+| DELETE | `/api/v1/organizations/current/members/:membershipId` | signed in | Remove a member (owner/admin, same rules as above), or leave by removing yourself (not the owner). Takes effect on their next request. |
+| GET | `/api/v1/organizations/current/invitations` | `members:manage` | Pending invitations. |
+| POST | `/api/v1/organizations/current/invitations` | `members:manage` | `{ email, role }` → `201 { invitation, token }`. The token is returned **once**; only its hash is stored. Re-inviting an email replaces the old link. `403 PLAN_LIMIT_REACHED` when members + pending invitations reach the plan's user limit. |
+| DELETE | `/api/v1/organizations/current/invitations/:id` | `members:manage` | Cancel a pending invitation. |
+| GET | `/api/v1/invitations/:token` | – | Public preview for the invite page: organization, email, role, inviter, expiry, `status`. |
+| POST | `/api/v1/invitations/:token/accept` | signed in | Join with the current account — the account's email must match the invitation. Switches to the new organization. |
+| POST | `/api/v1/invitations/:token/register` | – | `{ name, password }` → creates an account with the invited email and joins (no new organization). Rate-limited. |
+| POST | `/api/v1/invitations/:token/sign-in` | – | `{ password }` → signs in the invited email's existing account and joins. Rate-limited. |
 | GET | `/api/v1/clients?page=&pageSize=&search=` | `clients:read` | Paginated client list (sorted by name; search matches name or reference literally) plus `allowance: { used, limit }`. |
 | POST | `/api/v1/clients` | `clients:manage` | `{ name, internalReference?, brandProfile? }` — missing brand fields get defaults. `409` on a duplicate name (case-insensitive), `403 PLAN_LIMIT_REACHED` over the plan's workspace limit. |
 | GET | `/api/v1/clients/:clientId` | `clients:read` | One client. Another organization's id returns `404`, exactly like a missing one. |
@@ -156,7 +166,7 @@ State-changing requests (`POST`/`PUT`/`PATCH`/`DELETE`) must include the header 
 | GET | `/api/v1/jobs/:jobId/rows?status=&field=&search=&enrichment=&page=` | `jobs:read` | Paginated rows with original values, validation issues, AI suggestions and enrichment status. |
 | POST | `/api/v1/jobs/:jobId/enrich` | `jobs:edit` | `{ fields: ["title","description","seoTitle","seoDescription","tags"], language?, includeWarningRows? }` → `202`, job `queued`. `503 AI_NOT_CONFIGURED` without a key; `403 PLAN_LIMIT_REACHED` over the monthly allowance. |
 | POST | `/api/v1/jobs/:jobId/enrich/cancel` | `jobs:edit` | Stops a queued or running enrichment; suggestions already made are kept. |
-| PATCH | `/api/v1/jobs/:jobId/rows/:rowId` | `suggestions:review` | `{ field, action: "approve" \| "reject" \| "edit" \| "reset", value? }` — one decision on one suggestion. Blocked suggestions can't be approved as written; edits are checked against the client's prohibited claims. |
+| PATCH | `/api/v1/jobs/:jobId/rows/:rowId` | `suggestions:review` | `{ field, action: "approve" \| "reject" \| "edit" \| "reset", value? }` — one decision on one suggestion. Blocked suggestions can't be approved as written; edits are checked against the client's and the agency's prohibited claims. |
 | POST | `/api/v1/jobs/:jobId/approve` | `suggestions:review` | `{ rowIds?, fields? }` — bulk approve **pending suggestions without warnings** only. |
 | POST | `/api/v1/jobs/:jobId/reject` | `suggestions:review` | `{ rowIds?, fields? }` — bulk reject pending suggestions. |
 | GET | `/api/v1/jobs/:jobId/activity` | `audit:read` | Latest review/export actions on the job (who, what, when — never product text). |
@@ -164,13 +174,28 @@ State-changing requests (`POST`/`PUT`/`PATCH`/`DELETE`) must include the header 
 | GET | `/api/v1/jobs/:jobId/exports` | `jobs:read` | The job's exports. |
 | GET | `/api/v1/exports/:exportId` | `jobs:read` | Export details. |
 | GET | `/api/v1/exports/:exportId/download` | `jobs:read` | The CSV file (`Content-Disposition: attachment`, `no-store`). Checked against your organization and logged on every download. |
-| GET | `/api/v1/usage` | `usage:read` | This month: products enriched / reserved / limit, AI requests, failures, tokens, estimated cost, AI status. |
+| GET | `/api/v1/usage` | `usage:read` | This month: products enriched / reserved / limit, AI requests, failures, tokens, estimated cost, AI status, and `limits` (client workspaces, team seats, active jobs — used vs. plan). |
 | GET | `/api/v1/ai/status` | signed in | `{ configured, model }`. |
 | GET | `/api/v1/dashboard/summary` | signed in | Plan, client workspace count vs. limit, 5 most recently updated clients. |
 
 ### Plans
 
-Plan prices and limits live only in [`apps/api/src/config/plans.ts`](apps/api/src/config/plans.ts). Today only **client workspaces** are enforced (Trial/Solo: 1, Agency/Studio: unlimited — "multiple client workspaces" is listed as an Agency feature). Product, user and job limits are defined there and will be enforced with usage tracking in a later phase. New organizations start on the free trial.
+Plan prices and limits live only in [`apps/api/src/config/plans.ts`](apps/api/src/config/plans.ts), and all of them are enforced by the API: client workspaces, products enriched per month, team members (pending invitations count as seats, and the limit is checked again when a link is used, in case the plan was downgraded), and jobs in progress at once. The Usage page shows each one as "in use / included". New organizations start on the free trial (1 user, so inviting needs Agency or Studio).
+
+### Team and invitations
+
+There is no email service (it would cost money), so invitations are **links you share yourself**:
+
+1. An owner or admin enters an email and role and gets a link like `https://your-app/invite/<token>`. It's shown once — the database only keeps a SHA-256 hash of the token, so a database leak can't be turned into working links.
+2. The link works **once**, **only for that email**, and expires after 7 days. Re-inviting the same email cancels the old link; it can also be cancelled from settings.
+3. The invite page lets the person create an account (the email is fixed to the invited one), sign in with an existing account, or — if already signed in with that email — join in one click. No new organization is created for them.
+4. People in several agencies get an **organization switcher** in the header. Every request re-checks the membership, so removing someone (or changing their role) applies on their very next click.
+
+Only the owner can invite, promote or manage admins; nobody can change the owner or their own role; the owner can't leave.
+
+### Agency content rules
+
+Owners and admins can list **prohibited claims for the whole agency** (Organization settings → Content rules), e.g. "guaranteed" or "cures". They are merged with each client's own prohibited claims ([`content-rules.ts`](apps/api/src/modules/organizations/content-rules.ts)) and applied everywhere client rules are: in the AI prompt, in the guardrails that block suggestions, and when a reviewer edits text. Changes apply to new suggestions and edits; existing suggestions are not re-checked.
 
 ### Roles
 
@@ -292,8 +317,8 @@ Full deployment docs come with pilot readiness (Phase 6). The shape will be:
 - [x] **Milestone 1 — Foundation:** monorepo, env config, logging, error handling, MongoDB connection, health checks, shared schemas, web shell, tests
 - [x] **Milestone 2 — Auth & tenancy:** register/login/logout, secure sessions, organizations, memberships & roles, organization settings, tenant-isolation tests, seed script
 - [x] **Milestone 3 — Client workspaces & dashboard:** client CRUD with brand profiles, plan limits, real dashboard statistics, seed sample client, manual plan script
-- [ ] Later: team invitations by email, account & organization deletion policy, audit log
 - [x] **Phase 2 — File import:** catalogue jobs with a state machine, CSV/XLSX upload with private storage, worksheet & header-row selection, column mapping with suggestions, preview, deterministic validation, row-level report, job history
 - [x] **Phase 3 — AI enrichment:** provider abstraction (Anthropic), versioned prompt, structured & validated output, guardrails, background worker with leases and cancellation, usage ledger, monthly limits, usage page
 - [x] **Phase 4 — Review & export:** review table with approve/edit/reject/undo, bulk approve (warning-free only), audit log & activity, safe CSV export with authorised downloads, recent exports on the dashboard
-- [ ] **Phase 5–6 — Agency workflow & pilot readiness**
+- [x] **Phase 5 — Agency workflow:** team invitations by shareable one-time link, role changes / removal / leaving, plan user limits, organization switcher, agency-wide content rules, getting-started checklist, plan-limits table
+- [ ] **Phase 6 — Pilot readiness:** browser end-to-end tests (Playwright), security review, deployment guide, data retention & account/organization deletion policy, optional email delivery for invitations

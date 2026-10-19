@@ -20,19 +20,37 @@ export const organizationNameSchema = z
   .min(2, 'Organization name must be at least 2 characters.')
   .max(100, 'Organization name must be at most 100 characters.');
 
+/** One per line in the UI; matched without regard to letter case. */
+const ruleListSchema = z
+  .array(z.string().trim().min(1, 'Entries cannot be empty.').max(200, 'Entries must be at most 200 characters.'))
+  .max(100, 'Add at most 100 entries.');
+
+/**
+ * Agency-wide content rules that apply to every client, on top of each
+ * client's own brand profile (e.g. claims the agency never makes for anyone).
+ */
+export const contentRulesSchema = z.object({
+  prohibitedClaims: ruleListSchema,
+});
+export type ContentRules = z.infer<typeof contentRulesSchema>;
+
 export const organizationSchema = z.object({
   id: z.string(),
   name: z.string(),
   plan: planIdSchema,
   subscriptionStatus: subscriptionStatusSchema,
+  contentRules: contentRulesSchema,
   createdAt: z.iso.datetime(),
 });
 export type Organization = z.infer<typeof organizationSchema>;
 
-export const updateOrganizationSchema = z.object({
-  name: organizationNameSchema,
-});
-export type UpdateOrganizationInput = z.infer<typeof updateOrganizationSchema>;
+export const updateOrganizationSchema = z
+  .object({
+    name: organizationNameSchema.optional(),
+    contentRules: contentRulesSchema.optional(),
+  })
+  .refine((input) => input.name !== undefined || input.contentRules !== undefined, { error: 'Nothing to update.' });
+export type UpdateOrganizationInput = z.input<typeof updateOrganizationSchema>;
 
 export const memberSchema = z.object({
   membershipId: z.string(),

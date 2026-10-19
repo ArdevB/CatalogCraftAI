@@ -54,6 +54,11 @@ const usage = (overrides: Partial<UsageSummary> = {}): UsageSummary => ({
   outputTokens: 21_000,
   estimatedCostUsd: 0.63,
   ai: { configured: true, model: 'claude-opus-5-5' },
+  limits: {
+    clientWorkspaces: { used: 2, limit: null },
+    members: { used: 2, limit: 3 },
+    activeJobs: { used: 1, limit: null },
+  },
   ...overrides,
 });
 
@@ -167,8 +172,13 @@ describe('usage page', () => {
     renderRoute('/usage');
 
     expect(await screen.findByRole('heading', { name: 'Usage and plan' })).toBeInTheDocument();
-    expect(screen.getByText('100')).toBeInTheDocument();
     expect(screen.getByText('$0.63')).toBeInTheDocument();
+    // Plan limits: in use vs. included, one row per limit.
+    const limitCells = (name: string) =>
+      Array.from(screen.getByRole('rowheader', { name }).closest('tr')!.querySelectorAll('td'), (cell) => cell.textContent);
+    expect(limitCells('Products enriched this month')).toEqual(['100', '2,500']);
+    expect(limitCells('Client workspaces')).toEqual(['2', 'Unlimited']);
+    expect(limitCells('Team members (incl. pending invitations)')).toEqual(['2', '3']);
     expect(screen.getByText('Enabled — model claude-opus-5-5.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Usage' })).toHaveAttribute('href', '/usage');
   });

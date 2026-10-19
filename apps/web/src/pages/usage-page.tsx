@@ -71,6 +71,40 @@ export function UsagePage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Plan limits</CardTitle>
+          <CardDescription>What your {planLabel} plan includes, and how much of it is in use right now.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-muted-foreground">
+                <th scope="col" className="py-2 pr-4 font-medium">Limit</th>
+                <th scope="col" className="py-2 pr-4 text-right font-medium">In use</th>
+                <th scope="col" className="py-2 text-right font-medium">Included</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {[
+                { label: 'Products enriched this month', used: used + reserved, limit },
+                { label: 'Client workspaces', ...data.limits.clientWorkspaces },
+                { label: 'Team members (incl. pending invitations)', ...data.limits.members },
+                { label: 'Jobs in progress at once', ...data.limits.activeJobs },
+              ].map((row) => (
+                <tr key={row.label}>
+                  <th scope="row" className="py-2.5 pr-4 text-left font-normal">{row.label}</th>
+                  <td className={row.limit !== null && row.used >= row.limit ? 'py-2.5 pr-4 text-right font-medium text-destructive tabular-nums' : 'py-2.5 pr-4 text-right tabular-nums'}>
+                    {row.used.toLocaleString()}
+                  </td>
+                  <td className="py-2.5 text-right tabular-nums">{row.limit === null ? 'Unlimited' : row.limit.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>AI service</CardTitle>
           <CardDescription>
             {data.ai.configured ? `Enabled — model ${data.ai.model}.` : 'Not configured. Add AI_API_KEY to the API’s .env file to enable AI suggestions.'}

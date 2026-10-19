@@ -18,13 +18,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { applyServerFieldErrors } from '@/features/auth/apply-server-errors';
-
-/** Text areas hold one entry per line; the API takes a list. */
-const linesToList = (text: string) =>
-  text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
+import { linesToList } from '@/lib/utils';
 
 const brand = brandProfileSchema.shape;
 

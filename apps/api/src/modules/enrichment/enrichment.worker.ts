@@ -1,11 +1,11 @@
 import type { Types } from 'mongoose';
 import type { Logger } from 'pino';
-import { DEFAULT_BRAND_PROFILE, productValuesSchema, type BrandProfile, type EnrichableField } from '@catalogcraft/shared';
+import { productValuesSchema, type BrandProfile, type EnrichableField } from '@catalogcraft/shared';
 import { enrichProduct, type EnrichProductResult } from '../../services/ai/enrich-product.js';
 import { AiProviderError, type AiProvider } from '../../services/ai/provider.js';
 import { CatalogJobModel, type CatalogJob } from '../catalog-jobs/catalog-job.model.js';
 import { CatalogRowModel, type CatalogRow } from '../catalog-rows/catalog-row.model.js';
-import { ClientModel } from '../clients/client.model.js';
+import { effectiveBrandProfile } from '../organizations/content-rules.js';
 import { UsageEventModel } from '../usage/usage-event.model.js';
 
 type JobDoc = CatalogJob & { _id: Types.ObjectId };
@@ -95,15 +95,8 @@ export class EnrichmentWorker {
 
   private async processJob(job: JobDoc): Promise<void> {
     const settings = job.enrichment!;
-    const client = await ClientModel.findOne({ _id: job.clientId, organizationId: job.organizationId }).select('brandProfile').lean();
-    const brandProfile: BrandProfile = client?.brandProfile
-      ? {
-          ...client.brandProfile,
-          preferredTerminology: [...client.brandProfile.preferredTerminology],
-          prohibitedClaims: [...client.brandProfile.prohibitedClaims],
-          defaultLanguage: client.brandProfile.defaultLanguage as BrandProfile['defaultLanguage'],
-        }
-      : DEFAULT_BRAND_PROFILE;
+    // The client's brand profile plus the agency-wide content rules.
+    const brandProfile = await effectiveBrandProfile(job.organizationId, job.clientId);
     const context = { fields: settings.fields as EnrichableField[], language: settings.language, brandProfile };
 
     let consecutiveProviderErrors = 0;

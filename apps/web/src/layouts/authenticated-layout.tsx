@@ -2,7 +2,9 @@ import { LogOut, Loader2 } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import { hasPermission, type Permission } from '@catalogcraft/shared';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import { useLogout, useRequiredSession } from '@/features/auth/use-session';
+import { useSwitchOrganization } from '@/features/team/use-team';
 import { cn } from '@/lib/utils';
 import { BrandMark } from './app-layout';
 
@@ -13,6 +15,29 @@ const NAV_ITEMS: Array<{ to: string; label: string; permission?: Permission }> =
   { to: '/usage', label: 'Usage', permission: 'usage:read' },
   { to: '/settings/organization', label: 'Organization' },
 ];
+
+/** For people in more than one agency: switches the whole app to another organization. */
+function OrganizationSwitcher() {
+  const session = useRequiredSession();
+  const switchTo = useSwitchOrganization();
+  const navigate = useNavigate();
+
+  return (
+    <Select
+      aria-label="Organization"
+      className="h-8 w-auto max-w-48 text-xs"
+      value={session.organization.id}
+      disabled={switchTo.isPending}
+      onChange={(event) => switchTo.mutate(event.target.value, { onSuccess: () => void navigate('/dashboard') })}
+    >
+      {session.organizations.map((organization) => (
+        <option key={organization.id} value={organization.id}>
+          {organization.name}
+        </option>
+      ))}
+    </Select>
+  );
+}
 
 /** Shell for signed-in pages: navigation, organization name, and sign-out. */
 export function AuthenticatedLayout() {
@@ -49,9 +74,10 @@ export function AuthenticatedLayout() {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-3">
+            {session.organizations.length > 1 ? <OrganizationSwitcher /> : null}
             <div className="hidden text-right text-xs leading-tight sm:block">
               <p className="font-medium">{session.user.name}</p>
-              <p className="text-muted-foreground">{session.organization.name}</p>
+              {session.organizations.length > 1 ? null : <p className="text-muted-foreground">{session.organization.name}</p>}
             </div>
             <Button
               variant="ghost"

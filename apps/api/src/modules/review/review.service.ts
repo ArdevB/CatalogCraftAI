@@ -7,7 +7,7 @@ import { tenantScope } from '../../utils/tenant.js';
 import { recordAudit } from '../audit/audit.service.js';
 import { getJob } from '../catalog-jobs/catalog-job.service.js';
 import { CatalogRowModel } from '../catalog-rows/catalog-row.model.js';
-import { ClientModel } from '../clients/client.model.js';
+import { effectiveBrandProfile } from '../organizations/content-rules.js';
 
 type ReviewAction = z.output<typeof reviewActionSchema>;
 type BulkReview = z.output<typeof bulkReviewSchema>;
@@ -55,9 +55,9 @@ export async function reviewSuggestion(auth: AuthContext, jobId: string, rowId: 
       break;
     case 'edit': {
       // The reviewer's own text must still respect the client's brand rules.
-      const client = await ClientModel.findOne({ _id: job.clientId, ...tenantScope(auth) }).select('brandProfile').lean();
+      const brand = await effectiveBrandProfile(job.organizationId, job.clientId);
       const text = input.value!;
-      const claim = client?.brandProfile.prohibitedClaims.find((candidate) => text.toLowerCase().includes(candidate.trim().toLowerCase()));
+      const claim = brand.prohibitedClaims.find((candidate) => text.toLowerCase().includes(candidate.trim().toLowerCase()));
       if (claim) {
         throw new AppError('VALIDATION_ERROR', `“${claim}” is a prohibited claim for this client.`, {
           details: [{ path: 'body.value', message: `“${claim}” is a prohibited claim for this client.` }],

@@ -80,8 +80,10 @@ export function sessionInfo(role: Role = 'owner'): SessionInfo {
       name: 'Analytical Agency',
       plan: 'trial',
       subscriptionStatus: 'trialing',
+      contentRules: { prohibitedClaims: [] },
       createdAt: '2026-01-15T10:00:00.000Z',
     },
+    organizations: [{ id: 'o1', name: 'Analytical Agency', role }],
     role,
     permissions: permissionsForRole(role),
   };

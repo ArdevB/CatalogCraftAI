@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePermission, useRequiredSession } from '@/features/auth/use-session';
 import { useDashboardSummary } from '@/features/clients/use-clients';
+import { GettingStarted } from '@/features/onboarding/getting-started';
 import { RoleBadge } from '@/features/organization/role-badge';
 import { SystemStatusCard } from '@/features/system/system-status-card';
 import { JobStatusBadge } from '@/features/jobs/job-status';
@@ -42,6 +43,7 @@ function Summary() {
   const { clients, plan, recentClients, jobs, recentJobs, products, recentExports } = summary.data;
   return (
     <div className="flex flex-col gap-6">
+      <GettingStarted summary={summary.data} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Stat
           label="Client workspaces"

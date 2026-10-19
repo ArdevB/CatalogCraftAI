@@ -1,11 +1,13 @@
 import { Types } from 'mongoose';
-import type { UsageSummary } from '@catalogcraft/shared';
+import { FINISHED_JOB_STATUSES, type UsageSummary } from '@catalogcraft/shared';
 import { planLimits } from '../../config/plans.js';
 import { estimateCostUsd } from '../../services/ai/pricing.js';
 import type { AiProvider } from '../../services/ai/provider.js';
 import { AppError } from '../../utils/app-error.js';
 import { CatalogJobModel } from '../catalog-jobs/catalog-job.model.js';
+import { ClientModel } from '../clients/client.model.js';
 import { OrganizationModel } from '../organizations/organization.model.js';
+import { teamSeats } from '../team/team.service.js';
 import { UsageEventModel } from './usage-event.model.js';
 
 /** Usage resets on the first day of each calendar month (UTC). */
@@ -32,7 +34,7 @@ async function reservedProducts(organizationId: Types.ObjectId): Promise<number>
 export async function getUsage(organizationId: string, provider: AiProvider | null, now = new Date()): Promise<UsageSummary> {
   const orgId = new Types.ObjectId(organizationId);
   const period = currentPeriod(now);
-  const [organization, byModel, reserved] = await Promise.all([
+  const [organization, byModel, reserved, clientCount, activeJobs, seats] = await Promise.all([
     OrganizationModel.findById(orgId).select('plan').lean(),
     UsageEventModel.aggregate<{
       _id: string;
@@ -55,6 +57,9 @@ export async function getUsage(organizationId: string, provider: AiProvider | nu
       },
     ]),
     reservedProducts(orgId),
+    ClientModel.countDocuments({ organizationId: orgId }),
+    CatalogJobModel.countDocuments({ organizationId: orgId, status: { $nin: FINISHED_JOB_STATUSES } }),
+    teamSeats(orgId),
   ]);
   if (!organization) throw new AppError('NOT_FOUND', 'Organization not found.');
 
@@ -72,6 +77,11 @@ export async function getUsage(organizationId: string, provider: AiProvider | nu
     outputTokens: sum('outputTokens'),
     estimatedCostUsd: costs.some((cost) => cost === null) ? null : costs.reduce<number>((total, cost) => total + (cost ?? 0), 0),
     ai: { configured: provider !== null, model: provider?.model ?? null },
+    limits: {
+      clientWorkspaces: { used: clientCount, limit: planLimits(organization.plan).maxClientWorkspaces },
+      members: seats,
+      activeJobs: { used: activeJobs, limit: planLimits(organization.plan).maxActiveJobs },
+    },
   };
 }
 

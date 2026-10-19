@@ -31,7 +31,12 @@ export function organizationsRouter(): Router {
     const { body } = validateRequest(req, { body: updateOrganizationSchema });
     const organization = await OrganizationModel.findByIdAndUpdate(
       auth.organizationId,
-      { name: body.name },
+      {
+        $set: {
+          ...(body.name !== undefined ? { name: body.name } : {}),
+          ...(body.contentRules !== undefined ? { 'contentRules.prohibitedClaims': body.contentRules.prohibitedClaims } : {}),
+        },
+      },
       { returnDocument: 'after', runValidators: true },
     ).lean();
     if (!organization) throw new AppError('NOT_FOUND', 'Organization not found.');

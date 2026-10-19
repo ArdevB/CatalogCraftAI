@@ -12,6 +12,7 @@ export function toOrganizationDto(org: Organization & { _id: Types.ObjectId }): 
     name: org.name,
     plan: org.plan,
     subscriptionStatus: org.subscriptionStatus,
+    contentRules: { prohibitedClaims: [...(org.contentRules?.prohibitedClaims ?? [])] },
     createdAt: org.createdAt.toISOString(),
   };
 }
