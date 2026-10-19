@@ -3,7 +3,8 @@ import { render } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { vi } from 'vitest';
-import { permissionsForRole, type Role, type SessionInfo } from '@catalogcraft/shared';
+import { permissionsForRole, type DashboardSummary, type Role, type SessionInfo } from '@catalogcraft/shared';
+import { dashboardSummaryPath } from '@/features/clients/use-clients';
 import { createQueryClient } from '@/lib/query-client';
 import { routes } from '@/routes/router';
 
@@ -74,7 +75,7 @@ export function mockApi(handlers: Record<string, Handler>) {
 
 export function sessionInfo(role: Role = 'owner'): SessionInfo {
   return {
-    user: { id: 'u1', name: 'Ada Lovelace', email: 'ada@example.test' },
+    user: { id: 'u1', name: 'Ada Lovelace', email: 'ada@example.test', emailVerified: true },
     organization: {
       id: 'o1',
       name: 'Analytical Agency',
@@ -101,5 +102,30 @@ export function healthBody(database: 'connected' | 'disconnected' = 'connected')
       timestamp: new Date().toISOString(),
       checks: { database },
     },
+  };
+}
+
+/** The dashboard request key, including the viewer's time zone. */
+export const DASHBOARD_SUMMARY = `GET ${dashboardSummaryPath()}`;
+
+/** A complete dashboard summary with 30 quiet days, ending today. */
+export function dashboardSummary(overrides: Partial<DashboardSummary> = {}): DashboardSummary {
+  const today = Date.parse(new Date().toISOString().slice(0, 10));
+  return {
+    plan: 'agency',
+    clients: { used: 0, limit: null },
+    recentClients: [],
+    products: { used: 0, limit: 2500 },
+    jobs: { active: 0, activeLimit: null, needsReview: 0, failed: 0 },
+    recentExports: [],
+    recentJobs: [],
+    trend: Array.from({ length: 30 }, (_, i) => ({
+      date: new Date(today - (29 - i) * 86_400_000).toISOString().slice(0, 10),
+      productsEnriched: 0,
+      exports: 0,
+    })),
+    jobsByStatus: {},
+    pendingSuggestions: 0,
+    ...overrides,
   };
 }

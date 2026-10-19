@@ -20,6 +20,7 @@ import { ensureIndexes, getDatabaseStatus } from '../src/config/database.js';
 import { loadConfig, type AppConfig } from '../src/config/env.js';
 import { createLogger } from '../src/config/logger.js';
 import type { AiProvider } from '../src/services/ai/provider.js';
+import type { Mailer } from '../src/services/email/mailer.js';
 import { LocalFileStorage } from '../src/services/storage/storage.js';
 // Importing the models registers them with Mongoose.
 import '../src/modules/auth/user.model.js';
@@ -30,6 +31,7 @@ import '../src/modules/usage/usage-event.model.js';
 import '../src/modules/audit/audit-log.model.js';
 import '../src/modules/exports/export.model.js';
 import '../src/modules/team/invitation.model.js';
+import '../src/modules/auth/email-token.model.js';
 import { MembershipModel } from '../src/modules/memberships/membership.model.js';
 import { OrganizationModel } from '../src/modules/organizations/organization.model.js';
 
@@ -77,7 +79,7 @@ export async function disconnectTestDatabase(): Promise<void> {
 }
 
 /** The full app wired to the test database, with sessions stored in MongoDB like production. */
-export function dbTestApp(env: Record<string, string> = {}, options: { ai?: AiProvider | null } = {}) {
+export function dbTestApp(env: Record<string, string> = {}, options: { ai?: AiProvider | null; mailer?: Mailer } = {}) {
   const config = testConfig(env);
   return createApp({
     config,
@@ -85,6 +87,7 @@ export function dbTestApp(env: Record<string, string> = {}, options: { ai?: AiPr
     sessionStore: MongoStore.create({ client: mongoose.connection.getClient(), ttl: 3600 }),
     storage: testStorage,
     ai: options.ai ?? null,
+    ...(options.mailer ? { mailer: options.mailer } : {}),
     getDatabaseStatus,
   });
 }

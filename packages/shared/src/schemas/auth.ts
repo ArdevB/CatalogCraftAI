@@ -44,6 +44,8 @@ export const userSchema = z.object({
   id: z.string(),
   name: z.string(),
   email: z.string(),
+  /** Whether the user has confirmed their email address (by link). */
+  emailVerified: z.boolean(),
 });
 export type User = z.infer<typeof userSchema>;
 
@@ -76,3 +78,25 @@ export const changePasswordSchema = z.object({
   newPassword: passwordSchema,
 });
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+/** Links in emails carry a 43-character random token (256 bits). */
+export const emailTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/, 'This link is not valid.');
+
+export const verifyEmailSchema = z.object({ token: emailTokenSchema });
+
+export const forgotPasswordSchema = z.object({ email: emailSchema });
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+
+export const resetPasswordSchema = z.object({ token: emailTokenSchema, password: passwordSchema });
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+/** Public facts about this server the sign-in pages need (no secrets). */
+export const featuresSchema = z.object({
+  /** Whether the server can send email (verification, password reset, invitations). */
+  email: z.boolean(),
+});
+export type Features = z.infer<typeof featuresSchema>;
+
+/** How long emailed links stay valid. */
+export const EMAIL_VERIFICATION_TTL_HOURS = 48;
+export const PASSWORD_RESET_TTL_MINUTES = 60;

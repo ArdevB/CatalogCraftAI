@@ -158,7 +158,8 @@ describe('enrichment progress', () => {
 
     expect(await screen.findByText('Generating suggestions…')).toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'Enrichment progress' })).toHaveAttribute('aria-valuenow', '1');
-    expect(screen.getByText(/1 of 3 products \(33%\)/)).toBeInTheDocument();
+    expect(screen.getByText('33%')).toBeInTheDocument();
+    expect(screen.getByText(/1 of 3 products/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Stop enrichment' }));
     expect(await screen.findByText('Stopping after the current products…')).toBeInTheDocument();

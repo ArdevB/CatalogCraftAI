@@ -1,8 +1,22 @@
-import { Check, Loader2, Trash2 } from 'lucide-react';
+import {
+  Check,
+  ClipboardCheck,
+  Columns3,
+  FileSpreadsheet,
+  Loader2,
+  SearchX,
+  ShieldCheck,
+  Sparkles,
+  Trash2,
+  Upload,
+  type LucideIcon,
+} from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import type { Job } from '@catalogcraft/shared';
+import { BackLink } from '@/components/back-link';
 import { ErrorState, errorMessage, LoadingState } from '@/components/page-states';
+import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { usePermission } from '@/features/auth/use-session';
@@ -19,7 +33,13 @@ import { ValidationReport } from '@/features/jobs/validation-report';
 import { ApiError } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 
-const STEPS = ['Upload file', 'Map columns', 'Validate', 'Enrich with AI', 'Review & export'] as const;
+const STEPS: Array<{ label: string; icon: LucideIcon }> = [
+  { label: 'Upload file', icon: Upload },
+  { label: 'Map columns', icon: Columns3 },
+  { label: 'Validate', icon: ShieldCheck },
+  { label: 'Enrich with AI', icon: Sparkles },
+  { label: 'Review & export', icon: ClipboardCheck },
+];
 
 /** The step in progress, and how many steps are complete. */
 function progress(job: Job): { current: number; completed: number } {
@@ -44,32 +64,46 @@ function progress(job: Job): { current: number; completed: number } {
   }
 }
 
-/** Progress indicator only — not navigation, so the steps are not links or buttons. */
+/**
+ * Progress indicator only — not navigation, so the steps are not links or
+ * buttons. A gradient track fills up to the current step; the current step
+ * pulses and finished steps pop in with a tick.
+ */
 function Stepper({ job }: { job: Job }) {
   const { current, completed } = progress(job);
+  const filled = Math.min(completed, STEPS.length - 1) / (STEPS.length - 1);
   return (
-    <ol className="flex flex-wrap gap-x-6 gap-y-2 text-sm" aria-label="Import progress">
-      {STEPS.map((label, index) => {
-        const done = index < completed;
-        return (
-          <li key={label} className="flex items-center gap-2" aria-current={index === current ? 'step' : undefined}>
-            <span
-              className={cn(
-                'flex size-6 items-center justify-center rounded-full border text-xs font-medium',
-                done && 'border-success bg-success text-white',
-                index === current && !done && 'border-primary text-primary',
-                index > current && 'text-muted-foreground',
-              )}
-            >
-              {done ? <Check className="size-3.5" aria-hidden /> : index + 1}
-            </span>
-            <span className={cn(index > current && 'text-muted-foreground')}>
-              {label}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
+    <div className="rounded-xl border bg-card px-4 py-5 shadow-xs animate-rise sm:px-8" style={{ animationDelay: '60ms' }}>
+      <ol className="relative grid grid-cols-5" aria-label="Import progress">
+        {/* The track runs between the first and last circle centres. */}
+        <div aria-hidden className="absolute inset-x-[10%] top-[18px] h-1 rounded-full bg-muted">
+          <div
+            className="h-full origin-left rounded-full bg-gradient-to-r from-emerald-500 via-indigo-500 to-violet-500 transition-transform duration-1000 ease-[cubic-bezier(0.2,0.8,0.2,1)] animate-grow-x"
+            style={{ transform: `scaleX(${filled})` }}
+          />
+        </div>
+        {STEPS.map(({ label, icon: Icon }, index) => {
+          const done = index < completed;
+          const active = index === current && !done;
+          return (
+            <li key={label} className="relative flex flex-col items-center gap-2 text-center" aria-current={index === current ? 'step' : undefined}>
+              <span
+                className={cn(
+                  'relative grid size-10 place-items-center rounded-full border-2 bg-card transition-all duration-500',
+                  done && 'border-emerald-500 bg-emerald-500 text-white shadow-md shadow-emerald-500/30',
+                  active && 'border-primary text-primary shadow-md shadow-primary/25',
+                  !done && !active && 'border-border text-muted-foreground',
+                )}
+              >
+                {active ? <span aria-hidden className="absolute inset-0 rounded-full text-primary animate-pulse-ring" /> : null}
+                {done ? <Check className="size-5 animate-pop" aria-hidden /> : <Icon className="size-[18px]" aria-hidden />}
+              </span>
+              <span className={cn('text-xs font-medium sm:text-sm', index > current ? 'text-muted-foreground' : 'text-foreground')}>{label}</span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 
@@ -190,7 +224,10 @@ export function JobPage() {
     const notFound = job.error instanceof ApiError && (job.error.code === 'NOT_FOUND' || job.error.code === 'VALIDATION_ERROR');
     if (notFound) {
       return (
-        <section className="mx-auto flex max-w-md flex-col items-center gap-3 py-16 text-center">
+        <section className="mx-auto flex max-w-md flex-col items-center gap-3 py-16 text-center animate-rise">
+          <span className="grid size-14 place-items-center rounded-2xl tint-amber ring-1 ring-inset animate-float">
+            <SearchX className="size-7" aria-hidden />
+          </span>
           <h1 className="text-xl font-semibold">Job not found</h1>
           <p className="text-sm text-muted-foreground">It may have been deleted, or the link is wrong.</p>
           <Button asChild variant="outline">
@@ -208,23 +245,26 @@ export function JobPage() {
   const busy = data.status === 'validating' || data.status === 'processing' || data.status === 'exporting';
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex min-w-0 flex-col gap-1">
-          <Link to={`/clients/${data.client.id}`} className="text-sm text-muted-foreground hover:text-foreground">
-            ← {data.client.name}
-          </Link>
-          <h1 className="flex flex-wrap items-center gap-3 text-2xl font-semibold tracking-tight">
-            {data.name} <JobStatusBadge status={data.status} />
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {data.file ? `${data.file.filename} · ${formatBytes(data.file.sizeBytes)} · ` : ''}
-            Created by {data.createdBy.name} on {new Date(data.createdAt).toLocaleDateString()}
-          </p>
-        </div>
-        {canEdit && !busy ? <DeleteJob job={data} /> : null}
-      </div>
+      <PageHeader
+        eyebrow={<BackLink to={`/clients/${data.client.id}`}>{data.client.name}</BackLink>}
+        icon={FileSpreadsheet}
+        tint="sky"
+        title={data.name}
+        description={
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <JobStatusBadge status={data.status} />
+            <span>
+              {data.file ? `${data.file.filename} · ${formatBytes(data.file.sizeBytes)} · ` : ''}
+              Created by {data.createdBy.name} on {new Date(data.createdAt).toLocaleDateString()}
+            </span>
+          </span>
+        }
+        actions={canEdit && !busy ? <DeleteJob job={data} /> : null}
+      />
       <Stepper job={data} />
-      <JobBody job={data} view={view} setView={setView} />
+      <div className="animate-rise" style={{ animationDelay: '120ms' }}>
+        <JobBody job={data} view={view} setView={setView} />
+      </div>
     </div>
   );
 }

@@ -34,10 +34,14 @@ export function useClient(clientId: string) {
   });
 }
 
+/** Daily chart figures are counted in the viewer's own time zone. */
+export const dashboardSummaryPath = () =>
+  `/dashboard/summary?tz=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC')}`;
+
 export function useDashboardSummary() {
   return useQuery({
     queryKey: dashboardSummaryKey,
-    queryFn: ({ signal }) => apiRequest('/dashboard/summary', dashboardSummarySchema, { signal }),
+    queryFn: ({ signal }) => apiRequest(dashboardSummaryPath(), dashboardSummarySchema, { signal }),
   });
 }
 

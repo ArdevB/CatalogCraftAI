@@ -1,10 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CheckCircle2, Loader2, Trash2 } from 'lucide-react';
+import { CheckCircle2, Loader2, Trash2, UserRound } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router';
 import type { z } from 'zod';
 import { changePasswordSchema, deleteAccountSchema, PASSWORD_MIN_LENGTH } from '@catalogcraft/shared';
 import { FormField } from '@/components/form-field';
+import { PageHeader } from '@/components/page-header';
 import { errorMessage } from '@/components/page-states';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,8 @@ import { applyServerFieldErrors } from '@/features/auth/apply-server-errors';
 import { useChangePassword, useRequiredSession } from '@/features/auth/use-session';
 import { ROLE_LABELS } from '@/features/organization/role-badge';
 import { useDeleteAccount } from '@/features/organization/use-organization';
+import { avatarFor } from '@/features/dashboard/format';
+import { cn } from '@/lib/utils';
 
 function ChangePasswordCard() {
   const change = useChangePassword();
@@ -128,12 +131,17 @@ function DeleteAccountCard() {
 export function AccountPage() {
   const { user, organizations } = useRequiredSession();
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Your account</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>{user.name}</CardTitle>
-          <CardDescription>{user.email}</CardDescription>
+    <div className="flex max-w-3xl flex-col gap-6">
+      <PageHeader icon={UserRound} tint="violet" title="Your account" description="Your profile, password and data." />
+      <Card className="animate-rise" style={{ animationDelay: '60ms' }}>
+        <CardHeader className="flex-row items-center gap-4 space-y-0">
+          <span className={cn('grid size-14 shrink-0 place-items-center rounded-2xl text-lg font-semibold ring-1 ring-inset', avatarFor(user.name).tone)} aria-hidden>
+            {avatarFor(user.name).initials}
+          </span>
+          <div className="flex min-w-0 flex-col gap-1">
+            <CardTitle>{user.name}</CardTitle>
+            <CardDescription className="truncate">{user.email}</CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
           <h2 className="mb-2 text-sm font-medium">Organizations</h2>
@@ -147,8 +155,12 @@ export function AccountPage() {
           </ul>
         </CardContent>
       </Card>
-      <ChangePasswordCard />
-      <DeleteAccountCard />
+      <div className="animate-rise" style={{ animationDelay: '120ms' }}>
+        <ChangePasswordCard />
+      </div>
+      <div className="animate-rise" style={{ animationDelay: '180ms' }}>
+        <DeleteAccountCard />
+      </div>
     </div>
   );
 }

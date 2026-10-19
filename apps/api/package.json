@@ -36,6 +36,7 @@
     "mongodb": "^7.7.0",
     "mongoose": "^9.11.2",
     "multer": "^2.4.0",
+    "nodemailer": "10.0.15",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
     "zod": "^4.6.7"

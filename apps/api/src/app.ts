@@ -12,6 +12,7 @@ import { apiRateLimit, corsPolicy, securityHeaders } from './middleware/security
 import { webAppRouter } from './middleware/web-app.js';
 import { apiV1Router } from './routes.js';
 import type { AiProvider } from './services/ai/provider.js';
+import { DisabledMailer, type Mailer } from './services/email/mailer.js';
 import type { ErrorReporter } from './services/monitoring/error-alerts.js';
 import type { FileStorage } from './services/storage/storage.js';
 
@@ -24,6 +25,8 @@ export type AppDependencies = {
   storage: FileStorage;
   /** The AI provider, or `null` when AI is not configured. */
   ai: AiProvider | null;
+  /** Sends email; defaults to disabled (tests and setups without email). */
+  mailer?: Mailer;
   /** Optional alerting for unexpected errors (see ERROR_ALERT_WEBHOOK_URL). */
   reportError?: ErrorReporter;
   /** Injectable so tests can simulate a connected or disconnected database. */
@@ -41,6 +44,7 @@ export function createApp({
   sessionStore,
   storage,
   ai,
+  mailer = new DisabledMailer(),
   reportError,
   getDatabaseStatus = mongooseDatabaseStatus,
 }: AppDependencies): Express {
@@ -72,7 +76,8 @@ export function createApp({
   app.use(express.json({ limit: '1mb' }));
 
   app.use('/api', apiRateLimit(config));
-  app.use('/api/v1', apiV1Router({ config, getDatabaseStatus, sessionStore, storage, ai }));
+  const email = { mailer, appUrl: config.email.appUrl, logger };
+  app.use('/api/v1', apiV1Router({ config, getDatabaseStatus, sessionStore, storage, ai, email }));
   if (config.webDistDir) {
     const web = webAppRouter(config.webDistDir);
     app.use((req, res, next) => (isApi(req.path) ? next() : web(req, res, next)));

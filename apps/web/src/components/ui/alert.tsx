@@ -2,7 +2,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import type { ComponentProps } from 'react';
 import { cn } from '@/lib/utils';
 
-const alertVariants = cva('flex gap-2 rounded-md border p-3 text-sm [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0', {
+const alertVariants = cva('flex gap-2 rounded-lg border p-3 text-sm animate-rise [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0', {
   variants: {
     variant: {
       info: 'border-border bg-muted/60 text-foreground',

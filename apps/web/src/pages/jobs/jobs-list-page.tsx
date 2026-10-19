@@ -1,14 +1,19 @@
-import { FileSpreadsheet } from 'lucide-react';
+import { FileSpreadsheet, Filter, FolderKanban } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { JOB_STATUSES, type JobStatus } from '@catalogcraft/shared';
-import { ErrorState, LoadingState } from '@/components/page-states';
+import { EmptyState } from '@/components/empty-state';
+import { ErrorState } from '@/components/page-states';
+import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { avatarFor, timeAgo } from '@/features/dashboard/format';
 import { JOB_STATUS_LABELS, JobStatusBadge } from '@/features/jobs/job-status';
 import { useJobList } from '@/features/jobs/use-jobs';
+import { cn } from '@/lib/utils';
 
 export function JobsListPage() {
   const [status, setStatus] = useState<JobStatus | ''>('');
@@ -17,84 +22,104 @@ export function JobsListPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Catalogue jobs</h1>
-          <p className="text-sm text-muted-foreground">Every import across your clients. Start a new import from a client’s page.</p>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="status-filter">Status</Label>
-          <Select
-            id="status-filter"
-            className="w-48"
-            value={status}
-            onChange={(event) => {
-              setStatus(event.target.value as JobStatus | '');
-              setPage(1);
-            }}
-          >
-            <option value="">All statuses</option>
-            {JOB_STATUSES.map((value) => (
-              <option key={value} value={value}>
-                {JOB_STATUS_LABELS[value]}
-              </option>
-            ))}
-          </Select>
-        </div>
-      </div>
+      <PageHeader
+        icon={FolderKanban}
+        tint="sky"
+        title="Catalogue jobs"
+        description="Every import across your clients. Start a new import from a client’s page."
+        actions={
+          <div className="flex items-center gap-2 rounded-xl border bg-card px-3 py-1.5 shadow-xs">
+            <Filter className="size-4 text-muted-foreground" aria-hidden />
+            <Label htmlFor="status-filter" className="text-muted-foreground">
+              Status
+            </Label>
+            <Select
+              id="status-filter"
+              className="h-8 w-44 border-none shadow-none"
+              value={status}
+              onChange={(event) => {
+                setStatus(event.target.value as JobStatus | '');
+                setPage(1);
+              }}
+            >
+              <option value="">All statuses</option>
+              {JOB_STATUSES.map((value) => (
+                <option key={value} value={value}>
+                  {JOB_STATUS_LABELS[value]}
+                </option>
+              ))}
+            </Select>
+          </div>
+        }
+      />
 
       {jobs.isPending ? (
-        <LoadingState label="Loading jobs…" />
+        <div role="status" className="flex flex-col gap-2">
+          <span className="sr-only">Loading jobs…</span>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-14" />
+          ))}
+        </div>
       ) : jobs.isError ? (
         <ErrorState title="Could not load jobs" error={jobs.error} onRetry={() => void jobs.refetch()} isRetrying={jobs.isFetching} />
       ) : jobs.data.items.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-            <FileSpreadsheet className="size-8 text-muted-foreground" aria-hidden />
-            <p className="font-medium">{status ? 'No jobs with this status' : 'No catalogue jobs yet'}</p>
-            {!status ? (
-              <Button asChild size="sm">
-                <Link to="/clients">Choose a client to import for</Link>
-              </Button>
-            ) : null}
-          </CardContent>
-        </Card>
+        <EmptyState icon={FileSpreadsheet} title={status ? 'No jobs with this status' : 'No catalogue jobs yet'}>
+          {!status ? (
+            <Button asChild size="sm" className="mt-1">
+              <Link to="/clients">Choose a client to import for</Link>
+            </Button>
+          ) : null}
+        </EmptyState>
       ) : (
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th scope="col" className="px-4 py-2.5 font-medium">Job</th>
-                  <th scope="col" className="px-4 py-2.5 font-medium">Client</th>
-                  <th scope="col" className="px-4 py-2.5 font-medium">Status</th>
-                  <th scope="col" className="px-4 py-2.5 text-right font-medium">Rows</th>
-                  <th scope="col" className="px-4 py-2.5 text-right font-medium">Errors</th>
-                  <th scope="col" className="px-4 py-2.5 font-medium">Updated</th>
-                </tr>
-              </thead>
-              <tbody className={jobs.isPlaceholderData ? 'divide-y opacity-60' : 'divide-y'}>
-                {jobs.data.items.map((job) => (
-                  <tr key={job.id} className="hover:bg-muted/50">
-                    <td className="px-4 py-3 font-medium">
-                      <Link to={`/jobs/${job.id}`} className="text-primary hover:underline">
+        <div className="flex flex-col gap-3 animate-rise" style={{ animationDelay: '80ms' }}>
+          <Table className={cn(jobs.isPlaceholderData && 'opacity-60')}>
+            <TableHead>
+              <tr>
+                <TableHeader>Job</TableHeader>
+                <TableHeader>Client</TableHeader>
+                <TableHeader>Status</TableHeader>
+                <TableHeader className="text-right">Rows</TableHeader>
+                <TableHeader className="text-right">Errors</TableHeader>
+                <TableHeader>Updated</TableHeader>
+              </tr>
+            </TableHead>
+            <TableBody>
+              {jobs.data.items.map((job, index) => {
+                const { initials, tone } = avatarFor(job.client.name);
+                return (
+                  <TableRow key={job.id} index={index}>
+                    <TableCell className="font-medium">
+                      <Link to={`/jobs/${job.id}`} className="hover:text-primary hover:underline">
                         {job.name}
                       </Link>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{job.client.name}</td>
-                    <td className="px-4 py-3">
+                    </TableCell>
+                    <TableCell>
+                      <span className="flex items-center gap-2 text-muted-foreground">
+                        <span className={cn('grid size-6 shrink-0 place-items-center rounded-md text-[10px] font-semibold', tone)} aria-hidden>
+                          {initials}
+                        </span>
+                        {job.client.name}
+                      </span>
+                    </TableCell>
+                    <TableCell>
                       <JobStatusBadge status={job.status} />
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">{job.counts.totalRows || '—'}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{job.counts.totalRows ? job.counts.failedRows : '—'}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{new Date(job.updatedAt).toLocaleDateString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{job.counts.totalRows || '—'}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {job.counts.totalRows ? (
+                        <span className={cn(job.counts.failedRows > 0 && 'rounded-full px-2 py-0.5 font-medium tint-rose')}>{job.counts.failedRows}</span>
+                      ) : (
+                        '—'
+                      )}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">{timeAgo(job.updatedAt)}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
           {jobs.data.pagination.totalPages > 1 ? (
-            <nav aria-label="Pagination" className="flex items-center justify-between border-t px-4 py-3 text-sm">
+            <nav aria-label="Pagination" className="flex items-center justify-between rounded-xl border bg-card px-4 py-3 text-sm">
               <span className="text-muted-foreground">
                 Page {jobs.data.pagination.page} of {jobs.data.pagination.totalPages}
               </span>
@@ -108,7 +133,7 @@ export function JobsListPage() {
               </div>
             </nav>
           ) : null}
-        </Card>
+        </div>
       )}
     </div>
   );

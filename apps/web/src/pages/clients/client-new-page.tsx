@@ -1,4 +1,7 @@
-import { Link, useNavigate } from 'react-router';
+import { Building2 } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { BackLink } from '@/components/back-link';
+import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
 import { usePermission } from '@/features/auth/use-session';
 import { ClientForm } from '@/features/clients/client-form';
@@ -10,13 +13,8 @@ export function ClientNewPage() {
   const create = useCreateClient();
 
   return (
-    <div className="flex max-w-3xl flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <Link to="/clients" className="text-sm text-muted-foreground hover:text-foreground">
-          ← Clients
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">New client</h1>
-      </div>
+    <div className="flex max-w-4xl flex-col gap-6">
+      <PageHeader eyebrow={<BackLink to="/clients">Clients</BackLink>} icon={Building2} title="New client" description="A workspace with the brand rules AI suggestions must follow." />
 
       {canManage ? (
         <ClientForm

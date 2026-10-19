@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Check, Copy, Loader2 } from 'lucide-react';
+import { Check, Copy, Loader2, MailCheck } from 'lucide-react';
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import type { z } from 'zod';
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { applyServerFieldErrors } from '@/features/auth/apply-server-errors';
-import { useRequiredSession } from '@/features/auth/use-session';
+import { useFeatures, useRequiredSession } from '@/features/auth/use-session';
 import { useUsage } from '@/features/jobs/use-jobs';
 import { ROLE_LABELS, RoleBadge } from '@/features/organization/role-badge';
 import { useCreateInvitation, useInvitations, useRevokeInvitation } from './use-team';
@@ -23,7 +23,7 @@ const ROLE_HELP = {
 } as const;
 
 /** The link is shown once, right after it's made — only its hash is stored. */
-function InvitationLink({ email, link }: { email: string; link: string }) {
+function InvitationLink({ email, link, emailed }: { email: string; link: string; emailed: boolean }) {
   const [copied, setCopied] = useState<boolean | null>(null);
   const copy = () =>
     navigator.clipboard.writeText(link).then(
@@ -32,8 +32,11 @@ function InvitationLink({ email, link }: { email: string; link: string }) {
     );
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border bg-muted/40 p-3 text-sm">
-      <p className="font-medium">Invitation link for {email}</p>
+    <div className="flex flex-col gap-2 rounded-xl border bg-muted/40 p-3 text-sm animate-rise">
+      <p className="flex items-center gap-2 font-medium">
+        {emailed ? <MailCheck className="size-4 text-success" aria-hidden /> : null}
+        {emailed ? `We emailed the invitation to ${email}. You can also copy the link:` : `Invitation link for ${email}`}
+      </p>
       <div className="flex gap-2">
         <Input readOnly value={link} aria-label="Invitation link" onFocus={(event) => event.currentTarget.select()} />
         <Button type="button" variant="outline" onClick={() => void copy()}>
@@ -43,7 +46,7 @@ function InvitationLink({ email, link }: { email: string; link: string }) {
       </div>
       {copied === false ? <p className="text-destructive">Couldn’t copy automatically — select the link and copy it.</p> : null}
       <p className="text-muted-foreground">
-        Send it to them yourself (email, chat…). It works once, only for this email address, and expires in {INVITATION_TTL_DAYS} days.
+        {emailed ? '' : 'Send it to them yourself (email, chat…). '}It works once, only for this email address, and expires in {INVITATION_TTL_DAYS} days.
         You won’t be able to see it again — if it gets lost, invite them again.
       </p>
     </div>
@@ -56,16 +59,18 @@ export function InviteCard() {
   const revoke = useRevokeInvitation();
   const invitations = useInvitations(true);
   const seats = useUsage(true).data?.limits.members;
+  const canEmail = useFeatures().data?.email ?? false;
   const roles = ASSIGNABLE_ROLES.filter((option) => role === 'owner' || option !== 'admin');
 
   const form = useForm<z.input<typeof createInvitationSchema>, unknown, z.output<typeof createInvitationSchema>>({
     resolver: zodResolver(createInvitationSchema),
-    defaultValues: { email: '', role: 'editor' },
+    defaultValues: { email: '', role: 'editor', sendEmail: true },
   });
   const selectedRole = useWatch({ control: form.control, name: 'role' });
+  const sendEmail = useWatch({ control: form.control, name: 'sendEmail' });
   const onSubmit = form.handleSubmit((values) =>
     create.mutate(values, {
-      onSuccess: () => form.reset({ email: '', role: values.role }),
+      onSuccess: () => form.reset({ email: '', role: values.role, sendEmail: values.sendEmail }),
       onError: (error) => applyServerFieldErrors(error, ['email', 'role'], form.setError),
     }),
   );
@@ -94,16 +99,22 @@ export function InviteCard() {
             </SelectField>
           </div>
           <p className="text-sm text-muted-foreground">{ROLE_HELP[selectedRole as keyof typeof ROLE_HELP] ?? ''}</p>
+          {canEmail ? (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" className="size-4 accent-[var(--primary)]" {...form.register('sendEmail')} />
+              Email the link to them
+            </label>
+          ) : null}
           <div>
             <Button type="submit" disabled={create.isPending}>
               {create.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
-              Create invitation link
+              {canEmail && sendEmail ? 'Send invitation' : 'Create invitation link'}
             </Button>
           </div>
         </form>
 
         {create.data ? (
-          <InvitationLink email={create.data.invitation.email} link={`${window.location.origin}/invite/${create.data.token}`} />
+          <InvitationLink email={create.data.invitation.email} link={`${window.location.origin}/invite/${create.data.token}`} emailed={create.data.emailed} />
         ) : null}
 
         <div className="flex flex-col gap-2">

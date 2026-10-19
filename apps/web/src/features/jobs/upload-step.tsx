@@ -60,20 +60,22 @@ export function UploadStep({ jobId, replacing = false, onCancel }: { jobId: stri
           onDragLeave={() => setDragging(false)}
           onDrop={onDrop}
           className={cn(
-            'flex flex-col items-center gap-3 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors',
-            dragging ? 'border-primary bg-primary/5' : 'border-border',
+            'flex flex-col items-center gap-3 rounded-xl border-2 border-dashed px-6 py-12 text-center transition-all duration-300',
+            dragging ? 'scale-[1.01] border-primary bg-primary/5 shadow-lg shadow-primary/10' : 'border-border hover:border-primary/40 hover:bg-muted/40',
           )}
         >
           {upload.isPending ? (
             <>
-              <Loader2 className="size-8 animate-spin text-muted-foreground" aria-hidden />
+              <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
               <p className="text-sm" role="status">
                 Uploading and checking the file…
               </p>
             </>
           ) : (
             <>
-              <FileSpreadsheet className="size-8 text-muted-foreground" aria-hidden />
+              <span className={cn('grid size-14 place-items-center rounded-2xl tint-indigo ring-1 ring-inset transition-transform duration-300', dragging ? '-translate-y-1 scale-110' : 'animate-float')}>
+                <FileSpreadsheet className="size-7" aria-hidden />
+              </span>
               <p className="text-sm">
                 Drag a file here, or{' '}
                 <label htmlFor={inputId} className="cursor-pointer font-medium text-primary hover:underline">

@@ -31,6 +31,19 @@ Status as of Phase 6 (pilot readiness). The table below maps every item of the s
 
 Uploaded spreadsheets and AI output are treated as untrusted throughout: neither is ever executed, evaluated or rendered as HTML.
 
+## Email links
+
+Confirmation, password-reset and invitation links carry a 256-bit random token. They work as follows:
+
+- Only the token's SHA-256 hash is stored.
+- Each link works once.
+- Confirmation links expire after 48 hours, password-reset links after 60 minutes, and invitations after 7 days.
+- Asking for a new link cancels the old one.
+
+Forgot-password gives the same answer, at the same speed, whether or not an account exists, and the email is sent in the background. Requests that send email are limited to 5 per IP per window (`EMAIL_RATE_LIMIT_MAX`).
+
+Resetting a password signs out every existing session. Names in emails are HTML-escaped. SMTP requires TLS: port 587 must upgrade with STARTTLS. Emails are checked by `apps/api/tests/email.test.ts`.
+
 ## Fixed during this review
 
 - **Invitation tokens in logs.** Request logs included the full URL, so an invitation link (a secret) could be read from the logs. URLs are now logged as `/invitations/[token]`.
@@ -40,8 +53,9 @@ Uploaded spreadsheets and AI output are treated as untrusted throughout: neither
 
 ## Accepted risks and limitations (for the pilot)
 
-- **Account discovery.** Registration says when an email already has an account. This is common practice, and it's rate-limited. Hiding it needs email verification, which needs an email service.
-- **No email.** There's no email verification, self-service password reset or emailed invitations. Resets are done by an operator (`npm run reset-password`). Invitation links are shared by hand.
+- **Account discovery.** Registration says when an email already has an account. This is common practice, and it's rate-limited. (Forgot-password does *not* reveal it.)
+- **Unconfirmed addresses can still use the app.** A banner asks them to confirm their address, but nothing is blocked. Invitations are tied to the invited email address in any case.
+- **Email is optional.** Without it, resets are done by an operator (`npm run reset-password`) and invitation links are shared by hand.
 - **No two-factor authentication.**
 - **Rate limits are per server instance** (kept in memory). That's fine for one instance; use a shared store before scaling out.
 - **The AI provider receives product data.** Only copy-relevant fields are sent: no prices, stock, identifiers or personal data. Mention the provider as a processor in the pilot's privacy terms.

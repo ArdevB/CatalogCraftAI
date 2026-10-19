@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 import type { Job } from '@catalogcraft/shared';
 import { errorMessage } from '@/components/page-states';
 import { Alert } from '@/components/ui/alert';
@@ -19,14 +19,21 @@ export function EnrichmentProgress({ job }: { job: Job }) {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
-          {job.status === 'queued' ? 'Waiting to start…' : cancelling ? 'Stopping after the current products…' : 'Generating suggestions…'}
-        </CardTitle>
-        <CardDescription>
-          You can leave this page — the work continues in the background and is saved after every product.
-        </CardDescription>
+      <CardHeader className="flex-row items-center gap-5 space-y-0">
+        {/* A spinning colour ring around the AI icon while it works. */}
+        <span aria-hidden className="relative grid size-16 shrink-0 place-items-center">
+          <span className="absolute inset-0 rounded-full bg-[conic-gradient(from_0deg,var(--color-indigo-500),var(--color-violet-500),var(--color-sky-400),var(--color-emerald-400),var(--color-indigo-500))] animate-spin [animation-duration:2.4s]" />
+          <span className="absolute inset-[3px] rounded-full bg-card" />
+          <Sparkles className="relative size-7 text-primary animate-float" />
+        </span>
+        <div className="flex flex-col gap-1.5">
+          <CardTitle>
+            {job.status === 'queued' ? 'Waiting to start…' : cancelling ? 'Stopping after the current products…' : 'Generating suggestions…'}
+          </CardTitle>
+          <CardDescription>
+            You can leave this page — the work continues in the background and is saved after every product.
+          </CardDescription>
+        </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div
@@ -35,12 +42,16 @@ export function EnrichmentProgress({ job }: { job: Job }) {
           aria-valuemin={0}
           aria-valuemax={total}
           aria-valuenow={done}
-          className="h-2 w-full overflow-hidden rounded-full bg-muted"
+          className="h-3 w-full overflow-hidden rounded-full bg-muted"
         >
-          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${percent}%` }} />
+          <div
+            className="relative h-full overflow-hidden rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-sky-400 shimmer transition-[width] duration-700 ease-out"
+            style={{ width: `${Math.max(percent, 2)}%` }}
+          />
         </div>
         <p className="text-sm text-muted-foreground" aria-live="polite">
-          {done.toLocaleString()} of {total.toLocaleString()} products ({percent}%) ·{' '}
+          <span className="text-2xl font-semibold text-foreground tabular-nums">{percent}%</span>{' '}
+          · {done.toLocaleString()} of {total.toLocaleString()} products ·{' '}
           {(progress?.succeededRows ?? 0).toLocaleString()} succeeded · {(progress?.failedRows ?? 0).toLocaleString()} failed
         </p>
         {cancel.isError ? <Alert variant="destructive">{errorMessage(cancel.error)}</Alert> : null}

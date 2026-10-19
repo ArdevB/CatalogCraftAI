@@ -1,8 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import {
+  featuresSchema,
   hasPermission,
   sessionInfoSchema,
+  type ForgotPasswordInput,
+  type ResetPasswordInput,
   type ChangePasswordInput,
   type LoginInput,
   type Permission,
@@ -76,5 +79,49 @@ export function useLogout() {
       queryClient.removeQueries();
       queryClient.setQueryData(sessionQueryKey, null);
     },
+  });
+}
+
+/** What this server offers (e.g. whether it can send email). Public, cached for the visit. */
+export function useFeatures() {
+  return useQuery({
+    queryKey: ['features'],
+    queryFn: ({ signal }) => apiRequest('/features', featuresSchema, { signal }),
+    staleTime: Infinity,
+    retry: false,
+  });
+}
+
+export function useForgotPassword() {
+  return useMutation({
+    mutationFn: (input: ForgotPasswordInput) => apiRequest('/auth/forgot-password', z.null(), { method: 'POST', body: input }),
+  });
+}
+
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: (input: ResetPasswordInput) => apiRequest('/auth/reset-password', z.null(), { method: 'POST', body: input }),
+  });
+}
+
+/** Confirms the address from an emailed link (runs once when the page opens). */
+export function useVerifyEmail(token: string) {
+  const queryClient = useQueryClient();
+  return useQuery({
+    queryKey: ['verify-email', token],
+    queryFn: async () => {
+      await apiRequest('/auth/verify-email', z.null(), { method: 'POST', body: { token } });
+      // A signed-in session should stop showing the "please confirm" banner.
+      await queryClient.invalidateQueries({ queryKey: sessionQueryKey });
+      return true;
+    },
+    retry: false,
+    staleTime: Infinity,
+  });
+}
+
+export function useResendVerification() {
+  return useMutation({
+    mutationFn: () => apiRequest('/auth/resend-verification', z.null(), { method: 'POST' }),
   });
 }

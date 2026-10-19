@@ -1,5 +1,8 @@
-import { Link, useNavigate } from 'react-router';
+import { Pencil } from 'lucide-react';
+import { useNavigate } from 'react-router';
 import type { Client } from '@catalogcraft/shared';
+import { BackLink } from '@/components/back-link';
+import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
 import { usePermission } from '@/features/auth/use-session';
 import { ClientForm } from '@/features/clients/client-form';
@@ -12,13 +15,8 @@ function EditClient({ client }: { client: Client }) {
   const update = useUpdateClient(client.id);
 
   return (
-    <div className="flex max-w-3xl flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <Link to={`/clients/${client.id}`} className="text-sm text-muted-foreground hover:text-foreground">
-          ← {client.name}
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">Edit client</h1>
-      </div>
+    <div className="flex max-w-4xl flex-col gap-6">
+      <PageHeader eyebrow={<BackLink to={`/clients/${client.id}`}>{client.name}</BackLink>} icon={Pencil} title="Edit client" description="Changes apply to new AI suggestions." />
 
       {canManage ? (
         <ClientForm

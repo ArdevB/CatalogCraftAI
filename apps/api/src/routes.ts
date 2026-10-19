@@ -14,7 +14,9 @@ import { exportsRouter, reviewRouter } from './modules/review/review.routes.js';
 import { organizationsRouter } from './modules/organizations/organization.routes.js';
 import { invitationsRouter, teamRouter } from './modules/team/team.routes.js';
 import { aiStatusRouter, enrichmentRouter, usageRouter } from './modules/enrichment/enrichment.routes.js';
+import type { EmailDeps } from './modules/auth/email-flows.js';
 import type { AiProvider } from './services/ai/provider.js';
+import { sendSuccess } from './utils/http-response.js';
 import type { FileStorage } from './services/storage/storage.js';
 
 export type RouteDependencies = {
@@ -24,6 +26,7 @@ export type RouteDependencies = {
   storage: FileStorage;
   /** `null` when no AI key is configured. */
   ai: AiProvider | null;
+  email: EmailDeps;
 };
 
 /** Everything mounted under `/api/v1`. New modules register their routers here. */
@@ -36,16 +39,21 @@ export function apiV1Router(deps: RouteDependencies): Router {
     healthRouter({ environment: deps.config.nodeEnv, getDatabaseStatus: deps.getDatabaseStatus }),
   );
 
+  // What the sign-in pages may offer (e.g. "Forgot password?" needs email). No secrets.
+  router.get('/features', (_req, res) => {
+    sendSuccess(res, { email: deps.email.mailer.enabled });
+  });
+
   // Everything below needs MongoDB (including the session store).
   router.use(requireDatabase(deps.getDatabaseStatus));
   router.use(sessionMiddleware(deps.config, deps.sessionStore));
   router.use(csrfProtection(deps.config));
 
-  router.use('/auth', authRouter(deps.config));
+  router.use('/auth', authRouter(deps.config, deps.email));
   router.get('/me', meHandler);
   router.delete('/me', deleteAccountHandler(deps.config));
   router.use('/organizations', organizationsRouter(deps.storage));
-  router.use('/organizations/current', teamRouter());
+  router.use('/organizations/current', teamRouter(deps.email));
   router.use('/invitations', invitationsRouter(deps.config));
   router.use('/clients', clientsRouter());
   router.use('/dashboard', dashboardRouter());

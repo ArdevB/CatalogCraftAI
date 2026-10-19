@@ -41,6 +41,8 @@ const envSchema = z.object({
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(15 * 60 * 1000),
   RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(300),
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
+  /** Emails a visitor can trigger (password resets, verification resends) per IP per window. */
+  EMAIL_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(5),
 
   SESSION_SECRET: z
     .string({ error: 'SESSION_SECRET is required (see .env.example for how to generate one).' })
@@ -65,6 +67,22 @@ const envSchema = z.object({
   IMPORT_MAX_ROWS: z.coerce.number().int().min(1).max(50_000).default(2_000),
 
   /** Optional: without a key the app runs, and AI features explain they are not configured. */
+  /**
+   * Email: `none` (no email features), `log` (development: emails are written
+   * to the server log instead of being sent) or `smtp` (any SMTP provider).
+   * Defaults to `log` in development and `none` in production.
+   */
+  EMAIL_DRIVER: z.enum(['none', 'log', 'smtp']).optional(),
+  EMAIL_FROM: z.string().trim().optional(),
+  SMTP_HOST: z.string().trim().optional(),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+  /** true = TLS from the start (port 465); false = STARTTLS upgrade (port 587). */
+  SMTP_SECURE: z.stringbool().default(false),
+  SMTP_USER: z.string().trim().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  /** The public address of the web app, used in links inside emails. Defaults to the first WEB_ORIGIN. */
+  APP_URL: z.url({ protocol: /^https?$/, error: 'APP_URL must be an http(s) URL.' }).optional(),
+
   /** Optional Slack/Discord incoming-webhook URL for error alerts. */
   ERROR_ALERT_WEBHOOK_URL: z.url({ protocol: /^https$/, error: 'ERROR_ALERT_WEBHOOK_URL must be an https URL.' }).optional(),
 
@@ -77,9 +95,19 @@ const envSchema = z.object({
   AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
   AI_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(3),
 }).superRefine((env, ctx) => {
-  if (env.STORAGE_DRIVER !== 's3') return;
-  for (const key of ['S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'] as const) {
-    if (!env[key]) ctx.addIssue({ code: 'custom', path: [key], message: `${key} is required when STORAGE_DRIVER=s3.` });
+  if (env.STORAGE_DRIVER === 's3') {
+    for (const key of ['S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'] as const) {
+      if (!env[key]) ctx.addIssue({ code: 'custom', path: [key], message: `${key} is required when STORAGE_DRIVER=s3.` });
+    }
+  }
+  if (env.EMAIL_DRIVER === 'smtp') {
+    for (const key of ['SMTP_HOST', 'EMAIL_FROM'] as const) {
+      if (!env[key]) ctx.addIssue({ code: 'custom', path: [key], message: `${key} is required when EMAIL_DRIVER=smtp.` });
+    }
+  }
+  // Logged emails contain sign-in links: never in production.
+  if (env.EMAIL_DRIVER === 'log' && env.NODE_ENV === 'production') {
+    ctx.addIssue({ code: 'custom', path: ['EMAIL_DRIVER'], message: 'EMAIL_DRIVER=log is for development only. Use smtp or none in production.' });
   }
 });
 
@@ -94,7 +122,7 @@ export type AppConfig = Readonly<{
   mongodbUri: string;
   webOrigins: readonly string[];
   trustProxyHops: number;
-  rateLimit: Readonly<{ windowMs: number; max: number; authMax: number }>;
+  rateLimit: Readonly<{ windowMs: number; max: number; authMax: number; emailMax: number }>;
   session: Readonly<{ secret: string; ttlMs: number }>;
   /** Absolute directory for private files (uploads, exports). Never served directly. */
   storageDir: string;
@@ -111,6 +139,14 @@ export type AppConfig = Readonly<{
       }
   >;
   errorAlertWebhookUrl: string | null;
+  email: Readonly<{
+    driver: 'none' | 'log' | 'smtp';
+    /** Sender, e.g. "CatalogCraft <no-reply@example.com>". */
+    from: string;
+    /** Base URL for links in emails. */
+    appUrl: string;
+    smtp: Readonly<{ host: string; port: number; secure: boolean; user: string | undefined; password: string | undefined }> | null;
+  }>;
   /** Absolute path of the built web app to serve, or `null` when the web app is hosted separately. */
   webDistDir: string | null;
   imports: Readonly<{ maxUploadBytes: number; maxRows: number }>;
@@ -158,6 +194,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
       windowMs: env.RATE_LIMIT_WINDOW_MS,
       max: env.RATE_LIMIT_MAX,
       authMax: env.AUTH_RATE_LIMIT_MAX,
+      emailMax: env.EMAIL_RATE_LIMIT_MAX,
     }),
     session: Object.freeze({ secret: env.SESSION_SECRET, ttlMs: env.SESSION_TTL_HOURS * 60 * 60 * 1000 }),
     storageDir: path.resolve(REPO_ROOT, env.STORAGE_LOCAL_DIR),
@@ -175,6 +212,15 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
         : { driver: 'local' as const },
     ),
     errorAlertWebhookUrl: env.ERROR_ALERT_WEBHOOK_URL ?? null,
+    email: Object.freeze({
+      driver: env.EMAIL_DRIVER ?? (env.NODE_ENV === 'production' ? 'none' : 'log'),
+      from: env.EMAIL_FROM ?? 'CatalogCraft AI <no-reply@catalogcraft.local>',
+      appUrl: (env.APP_URL ?? env.WEB_ORIGIN[0]!).replace(/\/+$/, ''),
+      smtp:
+        env.EMAIL_DRIVER === 'smtp'
+          ? Object.freeze({ host: env.SMTP_HOST!, port: env.SMTP_PORT, secure: env.SMTP_SECURE, user: env.SMTP_USER, password: env.SMTP_PASSWORD })
+          : null,
+    }),
     webDistDir: env.WEB_DIST_DIR ? path.resolve(REPO_ROOT, env.WEB_DIST_DIR) : null,
     imports: Object.freeze({ maxUploadBytes: Math.round(env.UPLOAD_MAX_MB * 1024 * 1024), maxRows: env.IMPORT_MAX_ROWS }),
     ai: Object.freeze({

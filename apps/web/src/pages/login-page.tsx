@@ -46,6 +46,9 @@ export function LoginPage() {
       }
     >
       <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4">
+        {searchParams.get('reset') === '1' && !login.isError ? (
+          <Alert variant="success">Password changed. Sign in with your new password.</Alert>
+        ) : null}
         {login.isError && login.error ? <Alert variant="destructive">{errorMessage(login.error)}</Alert> : null}
         <FormField
           label="Email"
@@ -62,6 +65,9 @@ export function LoginPage() {
           error={errors.password?.message}
           {...form.register('password')}
         />
+        <Link to="/forgot-password" className="-mt-2 self-end text-sm font-medium text-primary hover:underline">
+          Forgot password?
+        </Link>
         <Button type="submit" disabled={login.isPending} className="mt-2">
           {login.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
           {login.isPending ? 'Signing in…' : 'Sign in'}

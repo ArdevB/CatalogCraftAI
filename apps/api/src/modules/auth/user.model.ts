@@ -13,6 +13,8 @@ const userSchema = new Schema(
     passwordHash: { type: String, required: true, select: false },
     status: { type: String, enum: USER_STATUSES, required: true, default: 'active' },
     lastLoginAt: { type: Date },
+    /** When the user confirmed their address by opening an emailed link (null = not yet). */
+    emailVerifiedAt: { type: Date, default: null },
     /** Increased whenever the password changes; sessions from before the change stop working. */
     authVersion: { type: Number, required: true, default: 0 },
   },

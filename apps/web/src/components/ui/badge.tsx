@@ -17,8 +17,17 @@ const badgeVariants = cva(
   },
 );
 
-type BadgeProps = ComponentProps<'span'> & VariantProps<typeof badgeVariants>;
+type BadgeProps = ComponentProps<'span'> &
+  VariantProps<typeof badgeVariants> & {
+    /** A coloured dot before the text; `live` makes it pulse (work in progress). */
+    dot?: boolean | 'live';
+  };
 
-export function Badge({ className, variant, ...props }: BadgeProps) {
-  return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
+export function Badge({ className, variant, dot, children, ...props }: BadgeProps) {
+  return (
+    <span className={cn(badgeVariants({ variant }), 'rounded-full', className)} {...props}>
+      {dot ? <span aria-hidden className={cn('size-1.5 rounded-full bg-current', dot === 'live' && 'animate-pulse-ring')} /> : null}
+      {children}
+    </span>
+  );
 }

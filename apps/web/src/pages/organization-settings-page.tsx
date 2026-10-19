@@ -3,7 +3,9 @@ import { CheckCircle2, Loader2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import type { z } from 'zod';
 import { updateOrganizationSchema } from '@catalogcraft/shared';
+import { Settings2 } from 'lucide-react';
 import { FormField } from '@/components/form-field';
+import { PageHeader } from '@/components/page-header';
 import { errorMessage } from '@/components/page-states';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -88,17 +90,18 @@ function OrganizationDetailsCard() {
 export function OrganizationSettingsPage() {
   const canManageTeam = usePermission('members:manage');
   const canDelete = usePermission('organization:delete');
+  const { organization } = useRequiredSession();
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Organization settings</h1>
+      <PageHeader icon={Settings2} title="Organization settings" description={`${organization.name} · your team, content rules and plan.`} />
       {/* minmax(0,…) lets wide content (the members table) scroll inside its card instead of widening the page. */}
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 animate-rise" style={{ animationDelay: '60ms' }}>
           <OrganizationDetailsCard />
           <ContentRulesCard />
           {canDelete ? <DeleteOrganizationCard /> : null}
         </div>
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 animate-rise" style={{ animationDelay: '140ms' }}>
           <MembersCard />
           {canManageTeam ? <InviteCard /> : null}
         </div>

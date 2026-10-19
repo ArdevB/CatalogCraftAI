@@ -4,6 +4,8 @@ import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router';
 import { createQueryClient } from '@/lib/query-client';
 import { createAppRouter } from '@/routes/router';
+// Self-hosted (no third-party font requests; allowed by the page's security policy).
+import '@fontsource-variable/inter';
 import './index.css';
 
 const rootElement = document.getElementById('root');

@@ -91,7 +91,7 @@ describe('starting an import from a client', () => {
     });
     const { router } = renderRoute(`/clients/${CLIENT_ID}`);
 
-    expect(await screen.findByText('No imports yet. Start one with “New import”.')).toBeInTheDocument();
+    expect(await screen.findByText('No imports yet')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'New import' }));
 
     expect(await screen.findByRole('heading', { name: 'Upload a catalogue file' })).toBeInTheDocument();

@@ -16,6 +16,7 @@ import { MockAiProvider } from '../tests/mock-ai.js';
 // Importing the models registers them, so their indexes are built.
 import '../src/modules/audit/audit-log.model.js';
 import '../src/modules/auth/user.model.js';
+import '../src/modules/auth/email-token.model.js';
 import '../src/modules/catalog-jobs/catalog-job.model.js';
 import '../src/modules/catalog-rows/catalog-row.model.js';
 import '../src/modules/clients/client.model.js';

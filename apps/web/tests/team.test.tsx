@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { DashboardSummary, InvitationPreview, Member, Role, SessionInfo } from '@catalogcraft/shared';
-import { fail, healthBody, jsonResponse, mockApi, ok, renderRoute, sessionInfo, unauthenticated } from './utils';
+import { DASHBOARD_SUMMARY, dashboardSummary, fail, healthBody, jsonResponse, mockApi, ok, renderRoute, sessionInfo, unauthenticated } from './utils';
 
 const TOKEN = 'T'.repeat(43);
 const ORG_2 = 'b'.repeat(24);
@@ -50,7 +50,7 @@ describe('invite page', () => {
       'GET /me': unauthenticated,
       [`GET /invitations/${TOKEN}`]: () => ok(preview()),
       [`POST /invitations/${TOKEN}/register`]: () =>
-        ok({ ...sessionInfo('editor'), user: { id: 'u2', name: 'Grace Hopper', email: 'grace@example.test' } }, 201),
+        ok({ ...sessionInfo('editor'), user: { id: 'u2', name: 'Grace Hopper', email: 'grace@example.test', emailVerified: true } }, 201),
     });
     const { router } = renderRoute(`/invite/${TOKEN}`);
 
@@ -87,7 +87,7 @@ describe('invite page', () => {
 
   it('lets a signed-in user with the invited email join in one click', async () => {
     const { fetchMock } = mockApi({
-      'GET /me': session('owner', { user: { id: 'u2', name: 'Grace', email: 'Grace@example.test' } }),
+      'GET /me': session('owner', { user: { id: 'u2', name: 'Grace', email: 'Grace@example.test', emailVerified: true } }),
       [`GET /invitations/${TOKEN}`]: () => ok(preview()),
       [`POST /invitations/${TOKEN}/accept`]: () => ok(sessionInfo('editor')),
     });
@@ -143,7 +143,7 @@ describe('team management', () => {
           expiresAt: '2026-10-26T10:00:00.000Z',
         };
         invitations = [invitation];
-        return ok({ invitation, token: TOKEN }, 201);
+        return ok({ invitation, token: TOKEN, emailed: false }, 201);
       },
       'DELETE /organizations/current/invitations/i1': () => {
         invitations = [];
@@ -159,7 +159,7 @@ describe('team management', () => {
 
     expect(await screen.findByLabelText('Invitation link')).toHaveValue(`${window.location.origin}/invite/${TOKEN}`);
     const sent = api.fetchMock.mock.calls.find(([url, init]) => String(url).endsWith('/invitations') && init?.method === 'POST');
-    expect(JSON.parse(String(sent![1]!.body))).toEqual({ email: 'new@example.test', role: 'reviewer' });
+    expect(JSON.parse(String(sent![1]!.body))).toMatchObject({ email: 'new@example.test', role: 'reviewer' });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Cancel invitation for new@example.test' }));
     expect(await screen.findByText('No pending invitations.')).toBeInTheDocument();
@@ -195,7 +195,7 @@ describe('team management', () => {
 
   it('shows admins only the controls they may use', async () => {
     mockApi({
-      'GET /me': session('admin', { user: { id: 'u3', name: 'Alan Turing', email: 'alan@example.test' } }),
+      'GET /me': session('admin', { user: { id: 'u3', name: 'Alan Turing', email: 'alan@example.test', emailVerified: true } }),
       'GET /organizations/current/members': () => ok(TEAM),
       'GET /organizations/current/invitations': () => ok([]),
       'GET /usage': usage,
@@ -210,13 +210,13 @@ describe('team management', () => {
 
   it('gives editors a read-only list and a way to leave', async () => {
     const { fetchMock } = mockApi({
-      'GET /me': session('editor', { user: { id: 'u2', name: 'Grace Hopper', email: 'grace@example.test' } }),
+      'GET /me': session('editor', { user: { id: 'u2', name: 'Grace Hopper', email: 'grace@example.test', emailVerified: true } }),
       'GET /organizations/current/members': () => ok(TEAM),
       'DELETE /organizations/current/members/m-u2': () => ok(null),
     });
     renderRoute('/settings/organization');
 
-    expect(await screen.findByText('grace@example.test')).toBeInTheDocument(); // the members table, not the header
+    expect(await screen.findByRole('cell', { name: 'grace@example.test' })).toBeInTheDocument(); // the members table, not the sidebar
     expect(screen.queryByRole('heading', { name: 'Invite a teammate' })).not.toBeInTheDocument();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
 
@@ -294,7 +294,7 @@ describe('getting started checklist', () => {
   beforeEach(() => localStorage.clear());
 
   const summary = (overrides: Partial<DashboardSummary> = {}): DashboardSummary => ({
-    plan: 'agency',
+    ...dashboardSummary(),
     clients: { used: 1, limit: null },
     recentClients: [{ id: 'e'.repeat(24), name: 'Kitchen Co', updatedAt: '2026-10-10T00:00:00.000Z' }],
     products: { used: 0, limit: 2500 },
@@ -308,7 +308,7 @@ describe('getting started checklist', () => {
     mockApi({
       'GET /me': session(),
       'GET /health': () => jsonResponse(healthBody()),
-      'GET /dashboard/summary': () => ok(summary()),
+      [DASHBOARD_SUMMARY]: () => ok(summary()),
       'GET /organizations/current/members': () => ok(TEAM.slice(0, 1)),
     });
     const view = renderRoute('/dashboard');
@@ -324,7 +324,7 @@ describe('getting started checklist', () => {
 
     view.unmount();
     renderRoute('/dashboard');
-    expect(await screen.findByText('Unlimited on your plan')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Activity' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Getting started' })).not.toBeInTheDocument();
   });
 
@@ -332,7 +332,7 @@ describe('getting started checklist', () => {
     mockApi({
       'GET /me': session('owner', { organization: { ...sessionInfo().organization, contentRules: { prohibitedClaims: ['guaranteed'] } } }),
       'GET /health': () => jsonResponse(healthBody()),
-      'GET /dashboard/summary': () =>
+      [DASHBOARD_SUMMARY]: () =>
         ok(summary({ recentExports: [{ id: 'x1', jobId: 'f'.repeat(24), filename: 'spring.csv', rowCount: 3, createdAt: '2026-10-12T00:00:00.000Z' }] })),
       'GET /organizations/current/members': () => ok(TEAM),
     });

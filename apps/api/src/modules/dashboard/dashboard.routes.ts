@@ -1,20 +1,21 @@
 import { Router } from 'express';
-import { FINISHED_JOB_STATUSES, type DashboardSummary } from '@catalogcraft/shared';
+import { dashboardQuerySchema, FINISHED_JOB_STATUSES, type DashboardSummary } from '@catalogcraft/shared';
 import { planLimits } from '../../config/plans.js';
 import { getAuth, requireAuth } from '../../middleware/require-auth.js';
 import { AppError } from '../../utils/app-error.js';
 import { sendSuccess } from '../../utils/http-response.js';
 import { tenantScope } from '../../utils/tenant.js';
+import { validateRequest } from '../../utils/validate-request.js';
 import { CatalogJobModel } from '../catalog-jobs/catalog-job.model.js';
 import { ClientModel } from '../clients/client.model.js';
 import { getWorkspaceAllowance } from '../clients/client.service.js';
 import { OrganizationModel } from '../organizations/organization.model.js';
 import { ExportModel } from '../exports/export.model.js';
 import { getUsage } from '../usage/usage.service.js';
+import { dashboardInsights } from './dashboard-trend.js';
 
 /**
- * Dashboard figures, computed from real data on each request. Product usage
- * and export statistics join this summary when those features are built.
+ * Dashboard figures, computed from real data on each request.
  */
 export function dashboardRouter(): Router {
   const router = Router();
@@ -22,8 +23,9 @@ export function dashboardRouter(): Router {
 
   router.get('/summary', async (req, res) => {
     const auth = getAuth(req);
+    const { query } = validateRequest(req, { query: dashboardQuerySchema });
     const scope = tenantScope(auth);
-    const [organization, clients, recentClients, active, needsReview, failed, recentJobs, usage, recentExports] = await Promise.all([
+    const [organization, clients, recentClients, active, needsReview, failed, recentJobs, usage, recentExports, insights] = await Promise.all([
       OrganizationModel.findById(auth.organizationId).select('plan').lean(),
       getWorkspaceAllowance(auth),
       ClientModel.find(scope).sort({ updatedAt: -1 }).limit(5).select('name updatedAt').lean(),
@@ -33,6 +35,7 @@ export function dashboardRouter(): Router {
       CatalogJobModel.find(scope).sort({ updatedAt: -1 }).limit(5).select('name status clientId updatedAt').lean(),
       getUsage(auth.organizationId, null),
       ExportModel.find(scope).sort({ createdAt: -1 }).limit(5).select('jobId filename rowCount createdAt').lean(),
+      dashboardInsights(auth.organizationId, query.tz),
     ]);
     if (!organization) throw new AppError('NOT_FOUND', 'Organization not found.');
 
@@ -65,6 +68,7 @@ export function dashboardRouter(): Router {
         clientName: clientNames.get(job.clientId.toString()) ?? 'Deleted client',
         updatedAt: job.updatedAt.toISOString(),
       })),
+      ...insights,
     };
     sendSuccess(res, summary);
   });

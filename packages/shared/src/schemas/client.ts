@@ -138,5 +138,36 @@ export const dashboardSummarySchema = z.object({
       updatedAt: z.iso.datetime(),
     }),
   ),
+  /** One entry per day for the last DASHBOARD_TREND_DAYS days (oldest first, in the requested time zone), including empty days. */
+  trend: z.array(
+    z.object({
+      /** YYYY-MM-DD */
+      date: z.string(),
+      productsEnriched: z.number().int().min(0),
+      exports: z.number().int().min(0),
+    }),
+  ),
+  /** How many jobs are in each status (statuses with no jobs are left out). */
+  jobsByStatus: z.partialRecord(jobStatusSchema, z.number().int().min(0)),
+  /** AI suggestions across all jobs still waiting for a decision. */
+  pendingSuggestions: z.number().int().min(0),
 });
 export type DashboardSummary = z.infer<typeof dashboardSummarySchema>;
+
+export const DASHBOARD_TREND_DAYS = 30;
+
+/** `tz` is the browser's IANA time zone, so "today" on the charts is the user's today. */
+export const dashboardQuerySchema = z.object({
+  tz: z
+    .string()
+    .max(64)
+    .refine((zone) => {
+      try {
+        new Intl.DateTimeFormat('en', { timeZone: zone });
+        return true;
+      } catch {
+        return false;
+      }
+    }, 'Unknown time zone.')
+    .default('UTC'),
+});

@@ -116,9 +116,31 @@ The restore refuses a database that already has data, so it can't overwrite anyt
 
 **Restore drill:** once a month, restore the latest backup into a new empty database (e.g. `catalogcraft-restore-test` on the same cluster). Then point a local copy of the app at it and sign in. A backup you've never restored is only a hope. The automated test `apps/api/tests/backup.test.ts` checks the mechanics on every run.
 
-### Password resets
+### Email (optional, free)
 
-There's no email service, so resets are done by you:
+With email set up, people confirm their address, reset forgotten passwords themselves, and receive invitations by email. Without it, everything still works: invitation links are copied by hand, and you reset passwords (below).
+
+[Brevo](https://www.brevo.com/)'s free plan allows about 300 emails a day over SMTP, which is plenty for a pilot. Other SMTP providers work the same way.
+
+1. Create a Brevo account and verify a sender address, or better, your own domain (add the DNS records Brevo shows you, so emails aren't marked as spam).
+2. Under *SMTP & API*, create an SMTP key.
+3. Set these on Render:
+   ```
+   EMAIL_DRIVER=smtp
+   SMTP_HOST=smtp-relay.brevo.com
+   SMTP_PORT=587
+   SMTP_USER=<your Brevo SMTP login>
+   SMTP_PASSWORD=<the SMTP key>
+   EMAIL_FROM=CatalogCraft <no-reply@yourdomain.com>
+   APP_URL=https://<your-service>.onrender.com
+   ```
+4. Test it: on the sign-in page, choose *Forgot password?* and use your own address.
+
+The API refuses to start if `EMAIL_DRIVER=smtp` is missing its host or sender, and it never allows the development `log` driver in production.
+
+### Password resets without email
+
+If email isn't set up (or someone can't receive it), reset the password yourself:
 
 ```
 npm run reset-password -- user@example.com
@@ -138,6 +160,7 @@ This prints a random temporary password and signs that user out everywhere. Send
 | --- | --- |
 | Export files | 30 days (`EXPORT_RETENTION_DAYS`), then deleted automatically. The reviewed data stays, so exports can be recreated. |
 | Invitations | Removed by MongoDB 30 days after they expire. |
+| Email links (confirmation, password reset) | Removed by MongoDB when they expire (48 hours / 60 minutes). |
 | Login sessions | End after 72 hours of inactivity (`SESSION_TTL_HOURS`). |
 | Clients, jobs, products, suggestions, usage, activity log | Until the job, client or organization is deleted. |
 | Organizations | Until the owner deletes them (*Organization settings → Delete organization*). Everything they own is deleted, including files. |

@@ -8,6 +8,7 @@ import { createLogger } from './config/logger.js';
 import { EnrichmentWorker } from './modules/enrichment/enrichment.worker.js';
 import { RetentionScheduler } from './modules/retention/retention.js';
 import { AnthropicProvider } from './services/ai/anthropic-provider.js';
+import { createMailer } from './services/email/mailer.js';
 import { createWebhookReporter } from './services/monitoring/error-alerts.js';
 import { createStorage } from './services/storage/storage.js';
 
@@ -51,7 +52,12 @@ const reportError = config.errorAlertWebhookUrl
   ? createWebhookReporter({ webhookUrl: config.errorAlertWebhookUrl, environment: config.nodeEnv, logger })
   : undefined;
 
-const app = createApp({ config, logger, sessionStore, storage, ai, reportError });
+const mailer = createMailer(config, logger);
+logger.info(
+  `Email: ${config.email.driver === 'smtp' ? `SMTP via ${config.email.smtp?.host}` : config.email.driver === 'log' ? 'written to this log (development)' : 'off'}`,
+);
+
+const app = createApp({ config, logger, sessionStore, storage, ai, mailer, reportError });
 
 // The enrichment worker starts once the database is connected.
 const worker = ai ? new EnrichmentWorker({ provider: ai, logger, concurrency: config.ai.concurrency }) : null;

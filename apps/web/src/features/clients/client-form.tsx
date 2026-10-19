@@ -18,7 +18,20 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { applyServerFieldErrors } from '@/features/auth/apply-server-errors';
+import { IdCard, Palette, type LucideIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { linesToList } from '@/lib/utils';
+
+function SectionTitle({ icon: Icon, children }: { icon: LucideIcon; children: ReactNode }) {
+  return (
+    <CardTitle className="flex items-center gap-2.5">
+      <span className="grid size-8 place-items-center rounded-lg tint-indigo ring-1 ring-inset">
+        <Icon className="size-4" aria-hidden />
+      </span>
+      {children}
+    </CardTitle>
+  );
+}
 
 const brand = brandProfileSchema.shape;
 
@@ -97,9 +110,9 @@ export function ClientForm({
     <form noValidate onSubmit={submit} className="flex flex-col gap-6">
       {errors.root?.server ? <Alert variant="destructive">{errors.root.server.message}</Alert> : null}
 
-      <Card>
+      <Card className="animate-rise" style={{ animationDelay: '60ms' }}>
         <CardHeader>
-          <CardTitle>Client details</CardTitle>
+          <SectionTitle icon={IdCard}>Client details</SectionTitle>
           <CardDescription>How your team identifies this client.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -113,9 +126,9 @@ export function ClientForm({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="animate-rise" style={{ animationDelay: '120ms' }}>
         <CardHeader>
-          <CardTitle>Brand profile</CardTitle>
+          <SectionTitle icon={Palette}>Brand profile</SectionTitle>
           <CardDescription>
             AI suggestions for this client follow these rules. They never add facts that aren’t in the product data.
           </CardDescription>
@@ -171,7 +184,8 @@ export function ClientForm({
         </CardContent>
       </Card>
 
-      <div className="flex gap-3">
+      {/* Stays in reach at the bottom of the screen while the form scrolls. */}
+      <div className="sticky bottom-4 z-10 flex gap-3 rounded-xl border bg-card/85 p-3 shadow-lg backdrop-blur-md animate-rise" style={{ animationDelay: '180ms' }}>
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? <Loader2 className="animate-spin" aria-hidden /> : null}
           {isSubmitting ? pendingLabel : submitLabel}

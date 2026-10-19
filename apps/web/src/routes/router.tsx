@@ -14,6 +14,7 @@ import { HomePage } from '@/pages/home-page';
 import { InvitePage } from '@/pages/invite-page';
 import { LoginPage } from '@/pages/login-page';
 import { NotFoundPage } from '@/pages/not-found-page';
+import { ForgotPasswordPage, ResetPasswordPage, VerifyEmailPage } from '@/pages/password-reset-pages';
 import { OrganizationSettingsPage } from '@/pages/organization-settings-page';
 import { RegisterPage } from '@/pages/register-page';
 import { RouteErrorPage } from '@/pages/route-error-page';
@@ -29,6 +30,10 @@ export const routes: RouteObject[] = [
           { index: true, element: <HomePage /> },
           // Works signed in or out, so it sits outside both guards.
           { path: 'invite/:token', element: <InvitePage /> },
+          // Emailed links work whether or not someone is signed in on this browser.
+          { path: 'forgot-password', element: <ForgotPasswordPage /> },
+          { path: 'reset-password/:token', element: <ResetPasswordPage /> },
+          { path: 'verify-email/:token', element: <VerifyEmailPage /> },
           {
             element: <RedirectIfAuthenticated />,
             children: [

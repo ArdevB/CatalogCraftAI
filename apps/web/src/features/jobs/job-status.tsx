@@ -27,8 +27,15 @@ const VARIANT: Record<JobStatus, 'neutral' | 'success' | 'warning' | 'destructiv
   failed: 'destructive',
 };
 
+/** Statuses where work is happening right now: their dot pulses. */
+const LIVE = new Set<JobStatus>(['validating', 'queued', 'processing', 'exporting']);
+
 export function JobStatusBadge({ status }: { status: JobStatus }) {
-  return <Badge variant={VARIANT[status]}>{JOB_STATUS_LABELS[status]}</Badge>;
+  return (
+    <Badge variant={VARIANT[status]} dot={LIVE.has(status) ? 'live' : true}>
+      {JOB_STATUS_LABELS[status]}
+    </Badge>
+  );
 }
 
 export function formatBytes(bytes: number): string {

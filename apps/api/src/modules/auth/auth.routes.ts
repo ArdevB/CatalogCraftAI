@@ -1,6 +1,16 @@
 import { Router, type RequestHandler } from 'express';
 import { rateLimit } from 'express-rate-limit';
-import { changePasswordSchema, deleteAccountSchema, loginSchema, registerSchema, switchOrganizationSchema } from '@catalogcraft/shared';
+import { Types } from 'mongoose';
+import {
+  changePasswordSchema,
+  deleteAccountSchema,
+  forgotPasswordSchema,
+  loginSchema,
+  registerSchema,
+  resetPasswordSchema,
+  switchOrganizationSchema,
+  verifyEmailSchema,
+} from '@catalogcraft/shared';
 import type { AppConfig } from '../../config/env.js';
 import { sessionCookieName, sessionCookieOptions } from '../../config/session.js';
 import { getAuth, loadAuthContext, requireAuth } from '../../middleware/require-auth.js';
@@ -9,6 +19,7 @@ import { sendError, sendSuccess } from '../../utils/http-response.js';
 import { destroySession, regenerateSession, saveSession, startSession } from '../../utils/session.js';
 import { validateRequest } from '../../utils/validate-request.js';
 import { findDefaultMembership, MembershipModel } from '../memberships/membership.model.js';
+import { requestPasswordReset, resetPassword, sendVerificationEmail, verifyEmail, type EmailDeps } from './email-flows.js';
 import { buildSessionInfo, changePassword, deleteAccount, registerAccount, verifyCredentials } from './auth.service.js';
 
 /**
@@ -29,14 +40,32 @@ export function credentialRateLimit(config: Pick<AppConfig, 'rateLimit'>): Reque
   });
 }
 
-export function authRouter(config: AppConfig): Router {
+/**
+ * Limits requests that make the server send an email. Unlike sign-in, every
+ * request counts (these always "succeed"), so they can't be used to flood an inbox.
+ */
+export function emailRateLimit(config: Pick<AppConfig, 'rateLimit'>): RequestHandler {
+  return rateLimit({
+    windowMs: config.rateLimit.windowMs,
+    limit: config.rateLimit.emailMax,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    handler: (_req, res) => {
+      sendError(res, 429, 'RATE_LIMITED', 'Too many emails requested. Please wait a few minutes and try again.');
+    },
+  });
+}
+
+export function authRouter(config: AppConfig, email: EmailDeps): Router {
   const router = Router();
   const limitCredentials = credentialRateLimit(config);
+  const limitEmails = emailRateLimit(config);
 
   router.post('/register', limitCredentials, async (req, res) => {
     const { body } = validateRequest(req, { body: registerSchema });
     const { userId, organizationId } = await registerAccount(body);
     await startSession(req, userId, organizationId);
+    await sendVerificationEmail(email, { _id: new Types.ObjectId(userId), name: body.name, email: body.email });
     // Same checks as every authenticated request, so the response matches GET /me exactly.
     const auth = await loadAuthContext(req);
     sendSuccess(res, await buildSessionInfo(auth), { status: 201, message: 'Account created.' });
@@ -77,6 +106,41 @@ export function authRouter(config: AppConfig): Router {
     req.session.authVersion = authVersion;
     await saveSession(req);
     sendSuccess(res, null, { message: 'Password changed. Other devices have been signed out.' });
+  });
+
+  // The link itself is the credential, so this needs no sign-in.
+  router.post('/verify-email', limitCredentials, async (req, res) => {
+    const { body } = validateRequest(req, { body: verifyEmailSchema });
+    await verifyEmail(body.token);
+    sendSuccess(res, null, { message: 'Email address confirmed.' });
+  });
+
+  router.post('/resend-verification', limitEmails, requireAuth, async (req, res) => {
+    const auth = getAuth(req);
+    if (auth.user.emailVerified) {
+      sendSuccess(res, null, { message: 'Your email address is already confirmed.' });
+      return;
+    }
+    if (!email.mailer.enabled) throw new AppError('SERVICE_UNAVAILABLE', 'Email is not set up on this server.');
+    const sent = await sendVerificationEmail(email, { _id: new Types.ObjectId(auth.userId), name: auth.user.name, email: auth.user.email });
+    if (!sent) throw new AppError('SERVICE_UNAVAILABLE', 'The email could not be sent. Please try again later.');
+    sendSuccess(res, null, { message: `We sent a new link to ${auth.user.email}.` });
+  });
+
+  // Same answer whether or not the address has an account, so it can't be used to discover who is registered.
+  router.post('/forgot-password', limitEmails, async (req, res) => {
+    const { body } = validateRequest(req, { body: forgotPasswordSchema });
+    if (!email.mailer.enabled) {
+      throw new AppError('SERVICE_UNAVAILABLE', 'Password resets by email are not set up on this server. Ask your administrator to reset it.');
+    }
+    requestPasswordReset(email, body.email);
+    sendSuccess(res, null, { message: 'If an account uses that address, we sent it a link to reset the password.' });
+  });
+
+  router.post('/reset-password', limitCredentials, async (req, res) => {
+    const { body } = validateRequest(req, { body: resetPasswordSchema });
+    await resetPassword(body.token, body.password);
+    sendSuccess(res, null, { message: 'Password changed. You can now sign in.' });
   });
 
   router.post('/logout', async (req, res) => {

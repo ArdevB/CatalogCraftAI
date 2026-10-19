@@ -15,6 +15,7 @@ import { saveSession, startSession } from '../../utils/session.js';
 import { validateRequest } from '../../utils/validate-request.js';
 import { credentialRateLimit } from '../auth/auth.routes.js';
 import { buildSessionInfo } from '../auth/auth.service.js';
+import type { EmailDeps } from '../auth/email-flows.js';
 import {
   acceptInvitation,
   changeMemberRole,
@@ -31,7 +32,7 @@ const idParams = z.object({ id: objectIdSchema });
 const tokenParams = z.object({ token: invitationTokenSchema });
 
 /** Mounted under /organizations/current: invitations and member management. */
-export function teamRouter(): Router {
+export function teamRouter(email: EmailDeps): Router {
   const router = Router();
   router.use(requireAuth);
   const canManage = requirePermission('members:manage');
@@ -42,7 +43,7 @@ export function teamRouter(): Router {
 
   router.post('/invitations', canManage, async (req, res) => {
     const { body } = validateRequest(req, { body: createInvitationSchema });
-    sendSuccess(res, await createInvitation(getAuth(req), body), { status: 201, message: 'Invitation created.' });
+    sendSuccess(res, await createInvitation(getAuth(req), body, email), { status: 201, message: 'Invitation created.' });
   });
 
   router.delete('/invitations/:id', canManage, async (req, res) => {

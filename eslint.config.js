@@ -31,6 +31,11 @@ export default tseslint.config(
     rules: { 'no-console': 'off' },
   },
   {
+    // Plain browser scripts served as-is (e.g. the theme start-up script).
+    files: ['apps/web/public/**/*.js'],
+    languageOptions: { globals: globals.browser, sourceType: 'script' },
+  },
+  {
     files: ['apps/web/**/*.{ts,tsx}'],
     languageOptions: { globals: globals.browser },
     plugins: { 'react-hooks': reactHooks },

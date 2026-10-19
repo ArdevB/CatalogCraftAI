@@ -1,10 +1,13 @@
-import { Loader2, Plus } from 'lucide-react';
+import { FolderKanban, Loader2, Plus } from 'lucide-react';
 import { Link, useNavigate } from 'react-router';
-import { ErrorState, errorMessage, LoadingState } from '@/components/page-states';
+import { EmptyState } from '@/components/empty-state';
+import { ErrorState, errorMessage } from '@/components/page-states';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { usePermission } from '@/features/auth/use-session';
+import { timeAgo } from '@/features/dashboard/format';
 import { JobStatusBadge } from './job-status';
 import { useCreateJob, useJobList } from './use-jobs';
 
@@ -36,24 +39,38 @@ export function ClientJobsCard({ clientId }: { clientId: string }) {
       <CardContent className="flex flex-col gap-3">
         {create.isError ? <Alert variant="destructive">{errorMessage(create.error)}</Alert> : null}
         {jobs.isPending ? (
-          <LoadingState label="Loading jobs…" />
+          <div role="status" className="flex flex-col gap-2">
+            <span className="sr-only">Loading jobs…</span>
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-12" />
+            ))}
+          </div>
         ) : jobs.isError ? (
           <ErrorState title="Could not load jobs" error={jobs.error} onRetry={() => void jobs.refetch()} isRetrying={jobs.isFetching} />
         ) : jobs.data.items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No imports yet.{canEdit ? ' Start one with “New import”.' : ''}
-          </p>
+          <EmptyState icon={FolderKanban} title="No imports yet">
+            <p className="max-w-xs text-sm text-muted-foreground">
+              Upload a supplier CSV or Excel file to start.{canEdit ? ' Start one with “New import”.' : ''}
+            </p>
+          </EmptyState>
         ) : (
-          <ul className="divide-y">
-            {jobs.data.items.map((job) => (
-              <li key={job.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-sm">
-                <Link to={`/jobs/${job.id}`} className="font-medium text-primary hover:underline">
-                  {job.name}
-                </Link>
-                <span className="flex items-center gap-3 text-muted-foreground">
-                  {job.counts.totalRows ? `${job.counts.totalRows.toLocaleString()} rows` : null}
-                  <JobStatusBadge status={job.status} />
+          <ul className="-mx-2 flex flex-col">
+            {jobs.data.items.map((job, index) => (
+              <li
+                key={job.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg px-2 py-2.5 text-sm transition-colors animate-rise hover:bg-muted/60"
+                style={{ animationDelay: `${index * 40}ms` }}
+              >
+                <span className="min-w-0">
+                  <Link to={`/jobs/${job.id}`} className="block truncate font-medium hover:text-primary hover:underline">
+                    {job.name}
+                  </Link>
+                  <span className="text-xs text-muted-foreground">
+                    {job.counts.totalRows ? `${job.counts.totalRows.toLocaleString()} rows · ` : ''}
+                    {timeAgo(job.updatedAt)}
+                  </span>
                 </span>
+                <JobStatusBadge status={job.status} />
               </li>
             ))}
           </ul>

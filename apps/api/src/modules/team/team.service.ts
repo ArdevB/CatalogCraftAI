@@ -1,4 +1,3 @@
-import { createHash, randomBytes } from 'node:crypto';
 import { Types } from 'mongoose';
 import {
   INVITATION_TTL_DAYS,
@@ -13,7 +12,10 @@ import { planLimits } from '../../config/plans.js';
 import type { AuthContext } from '../../middleware/require-auth.js';
 import { AppError } from '../../utils/app-error.js';
 import { tenantScope } from '../../utils/tenant.js';
+import { hashToken, newToken } from '../../utils/tokens.js';
+import { invitationEmail } from '../../services/email/templates.js';
 import { createUser, verifyCredentials } from '../auth/auth.service.js';
+import { markEmailVerified, type EmailDeps } from '../auth/email-flows.js';
 import { UserModel } from '../auth/user.model.js';
 import { MembershipModel } from '../memberships/membership.model.js';
 import { OrganizationModel } from '../organizations/organization.model.js';
@@ -21,7 +23,6 @@ import { InvitationModel, type Invitation } from './invitation.model.js';
 
 type InvitationDoc = Invitation & { _id: Types.ObjectId };
 
-const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
 const pendingFilter = () => ({ acceptedAt: null, revokedAt: null, expiresAt: { $gt: new Date() } });
 
 /** Members plus pending invitations both count towards the plan's user limit. */
@@ -57,7 +58,11 @@ export async function listInvitations(auth: AuthContext): Promise<InvitationDto[
  * Creates an invitation and returns its one-time token. Re-inviting the same
  * email replaces the earlier pending invitation (so old links stop working).
  */
-export async function createInvitation(auth: AuthContext, input: { email: string; role: AssignableRole }): Promise<CreatedInvitation> {
+export async function createInvitation(
+  auth: AuthContext,
+  input: { email: string; role: AssignableRole; sendEmail: boolean },
+  email?: EmailDeps,
+): Promise<CreatedInvitation> {
   if (auth.role !== 'owner' && input.role === 'admin') {
     throw new AppError('FORBIDDEN', 'Only the owner can invite admins.');
   }
@@ -75,8 +80,7 @@ export async function createInvitation(auth: AuthContext, input: { email: string
     );
   }
 
-  // 32 random bytes → 43 URL-safe characters; guessing one is not feasible.
-  const token = randomBytes(32).toString('base64url');
+  const token = newToken();
   const invitation = await InvitationModel.create({
     ...tenantScope(auth),
     email: input.email,
@@ -86,7 +90,30 @@ export async function createInvitation(auth: AuthContext, input: { email: string
     expiresAt: new Date(Date.now() + INVITATION_TTL_DAYS * 24 * 60 * 60 * 1000),
   });
   const [dto] = await toInvitationDtos([invitation.toObject()]);
-  return { invitation: dto!, token };
+  const emailed = input.sendEmail && email ? await emailInvitation(email, auth, input, token) : false;
+  return { invitation: dto!, token, emailed };
+}
+
+/** Emails the link too. A failed email never fails the invitation: the link is still shown to copy. */
+async function emailInvitation(deps: EmailDeps, auth: AuthContext, input: { email: string; role: AssignableRole }, token: string): Promise<boolean> {
+  if (!deps.mailer.enabled) return false;
+  try {
+    const organization = await OrganizationModel.findById(auth.organizationId).select('name').lean();
+    await deps.mailer.send(
+      invitationEmail({
+        to: input.email,
+        inviterName: auth.user.name,
+        organizationName: organization?.name ?? 'your team',
+        role: input.role,
+        url: `${deps.appUrl}/invite/${token}`,
+        days: INVITATION_TTL_DAYS,
+      }),
+    );
+    return true;
+  } catch (error) {
+    deps.logger.warn({ err: error }, 'Could not email the invitation');
+    return false;
+  }
 }
 
 export async function revokeInvitation(auth: AuthContext, invitationId: string): Promise<void> {
@@ -185,6 +212,7 @@ export async function registerFromInvitation(
   const user = await createUser({ name: input.name, email: invitation.email, password: input.password });
   try {
     const { organizationId } = await claim(token, user._id);
+    await markEmailVerified(user._id); // the invitation link reached this address
     return { userId: user._id.toString(), organizationId };
   } catch (error) {
     await UserModel.deleteOne({ _id: user._id }); // no half-created accounts
@@ -206,6 +234,7 @@ export async function signInFromInvitation(
   if (status !== 'pending') throw new AppError('CONFLICT', UNUSABLE[status]);
   const userId = await verifyCredentials({ email: invitation.email, password: input.password });
   const { organizationId } = await claim(token, new Types.ObjectId(userId));
+  await markEmailVerified(userId);
   return { userId, organizationId };
 }
 

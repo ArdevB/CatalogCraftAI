@@ -8,6 +8,7 @@ import { createStorage } from '../services/storage/storage.js';
 // Importing the models registers them, so their indexes are rebuilt after the restore.
 import '../modules/audit/audit-log.model.js';
 import '../modules/auth/user.model.js';
+import '../modules/auth/email-token.model.js';
 import '../modules/catalog-jobs/catalog-job.model.js';
 import '../modules/catalog-rows/catalog-row.model.js';
 import '../modules/clients/client.model.js';

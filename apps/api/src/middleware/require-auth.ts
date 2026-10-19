@@ -10,7 +10,7 @@ export type AuthContext = {
   /** The organization every tenant-owned query in this request must be scoped to. */
   organizationId: string;
   role: Role;
-  user: { id: string; name: string; email: string };
+  user: { id: string; name: string; email: string; emailVerified: boolean };
 };
 
 /**
@@ -65,7 +65,7 @@ export async function loadAuthContext(req: Request): Promise<AuthContext> {
     userId,
     organizationId: membership.organizationId.toString(),
     role: membership.role,
-    user: { id: userId, name: user.name, email: user.email },
+    user: { id: userId, name: user.name, email: user.email, emailVerified: Boolean(user.emailVerifiedAt) },
   };
   return req.auth;
 }

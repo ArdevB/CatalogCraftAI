@@ -28,7 +28,7 @@ async function registerAgency(page: Page, agencyName: string) {
   await page.getByLabel('Work email').fill(email);
   await page.getByLabel('Password').fill('a-long-e2e-password');
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page.getByRole('heading', { name: /Welcome, E2E Tester/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening), E2E$/ })).toBeVisible();
   return email;
 }
 

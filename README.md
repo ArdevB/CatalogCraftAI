@@ -108,6 +108,9 @@ All settings come from environment variables, validated at startup by [`apps/api
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | with `s3` | region `auto` | Bucket settings for `STORAGE_DRIVER=s3` |
 | `WEB_DIST_DIR` | no | – | Serve the built web app from the API (one service, one origin), e.g. `./apps/web/dist` |
 | `ERROR_ALERT_WEBHOOK_URL` | no | – | Slack/Discord webhook for unexpected-error alerts |
+| `EMAIL_DRIVER` | no | `log` (dev) / `none` (prod) | `none`, `log` (development: emails go to the API log) or `smtp` |
+| `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD` | with `smtp` | port `587` | SMTP settings — see [email setup](docs/DEPLOYMENT.md#email-optional-free) |
+| `APP_URL` | no | first `WEB_ORIGIN` | Public web address used in email links |
 | `UPLOAD_MAX_MB` | no | `10` | Maximum upload size |
 | `IMPORT_MAX_ROWS` | no | `2000` | Maximum product rows per job |
 | `AI_API_KEY` | no | – | Anthropic API key. Without it, AI features report "not configured" (never fake results). `ANTHROPIC_API_KEY` is also accepted. |
@@ -151,6 +154,11 @@ State-changing requests (`POST`/`PUT`/`PATCH`/`DELETE`) must include the header 
 | GET | `/api/v1/me` | signed in | Current user, active organization, role and permissions. |
 | DELETE | `/api/v1/me` | signed in | `{ password }` — deletes your account and memberships. `409` while you own an organization. |
 | POST | `/api/v1/auth/change-password` | signed in | `{ currentPassword, newPassword }` — keeps this session, signs out all others. |
+| GET | `/api/v1/features` | – | `{ email }` — whether this server can send email. |
+| POST | `/api/v1/auth/verify-email` | – | `{ token }` from the emailed link → marks the address confirmed. |
+| POST | `/api/v1/auth/resend-verification` | signed in | Sends a new confirmation link (rate-limited). |
+| POST | `/api/v1/auth/forgot-password` | – | `{ email }` → emails a 60-minute reset link. Same answer whether or not the account exists; rate-limited; `503` when email is off. |
+| POST | `/api/v1/auth/reset-password` | – | `{ token, password }` → sets the password and signs out every session. |
 | GET | `/api/v1/organizations/current` | `organization:read` | The active organization. |
 | POST | `/api/v1/auth/switch-organization` | signed in | `{ organizationId }` — switch the active organization. `404` unless you are a member. |
 | PATCH | `/api/v1/organizations/current` | `organization:update` | `{ name?, contentRules?: { prohibitedClaims } }` — rename, or set the agency-wide content rules (owner, admin). |
@@ -341,4 +349,5 @@ The same checks run on every push via GitHub Actions ([`.github/workflows/ci.yml
 - [x] **Phase 4 — Review & export:** review table with approve/edit/reject/undo, bulk approve (warning-free only), audit log & activity, safe CSV export with authorised downloads, recent exports on the dashboard
 - [x] **Phase 5 — Agency workflow:** team invitations by shareable one-time link, role changes / removal / leaving, plan user limits, organization switcher, agency-wide content rules, getting-started checklist, plan-limits table
 - [x] **Phase 6 — Pilot readiness:** Playwright end-to-end tests, security review and fixes, organization/account deletion, password change and reset, data retention, S3-compatible storage, single-service deployment, error references and alerts, backup/restore with verification, performance script, CI, deployment and acceptance-testing guides
-- [ ] **Next (after pilot feedback):** email delivery (verification, password reset, invitations), two-factor authentication, payments, Shopify integration — only once the CSV workflow is validated by customers (spec §15)
+- [x] **After Phase 6:** dashboard redesign with charts, left sidebar navigation, dark mode, redesigned pages with motion, email (address confirmation, self-service password reset, emailed invitations)
+- [ ] **Next (after pilot feedback):** two-factor authentication, payments, Shopify integration — only once the CSV workflow is validated by customers (spec §15)

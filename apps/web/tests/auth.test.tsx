@@ -37,7 +37,7 @@ describe('protected routes', () => {
     handlers['GET /me'] = () => ok(sessionInfo());
     handlers['GET /health'] = health;
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(await screen.findByRole('heading', { name: 'Welcome, Ada Lovelace' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /^Good (morning|afternoon|evening), Ada$/ })).toBeInTheDocument();
   });
 
   it('returns to the login page when the session expires mid-use', async () => {
@@ -105,7 +105,7 @@ describe('login', () => {
     mockApi({ 'GET /me': () => ok(sessionInfo()), 'GET /health': health });
     renderRoute('/login');
 
-    expect(await screen.findByRole('heading', { name: 'Welcome, Ada Lovelace' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /^Good (morning|afternoon|evening), Ada$/ })).toBeInTheDocument();
   });
 });
 
@@ -132,7 +132,7 @@ describe('registration', () => {
     await fillRegistration();
     await userEvent.click(screen.getByRole('button', { name: 'Create account' }));
 
-    expect(await screen.findByRole('heading', { name: 'Welcome, Ada Lovelace' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /^Good (morning|afternoon|evening), Ada$/ })).toBeInTheDocument();
     expect(submitted).toEqual({
       name: 'Ada Lovelace',
       email: 'ada@example.test',
@@ -236,8 +236,8 @@ describe('signed-in area', () => {
 
     expect(await screen.findByText('Organization name saved.')).toBeInTheDocument();
     expect(patched).toEqual({ name: 'Renamed Agency' });
-    // The header (which reads the session) shows the new name too.
-    expect(screen.getByRole('banner')).toHaveTextContent('Renamed Agency');
+    // The sidebar (which reads the session) shows the new name too.
+    expect(screen.getByRole('complementary', { name: 'Sidebar' })).toHaveTextContent('Renamed Agency');
   });
 
   it('shows organization details read-only to roles that cannot edit them', async () => {

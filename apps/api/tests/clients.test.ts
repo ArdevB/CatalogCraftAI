@@ -247,7 +247,8 @@ describe('client tenant isolation', () => {
     const summary = apiSuccessResponseSchema(dashboardSummarySchema).parse(
       (await agencyA.client.get('/api/v1/dashboard/summary')).body,
     ).data;
-    expect(summary).toEqual({
+    const { trend, ...rest } = summary;
+    expect(rest).toEqual({
       plan: 'trial',
       clients: { used: 0, limit: 1 },
       recentClients: [],
@@ -255,7 +256,10 @@ describe('client tenant isolation', () => {
       jobs: { active: 0, activeLimit: 1, needsReview: 0, failed: 0 },
       recentJobs: [],
       recentExports: [],
+      jobsByStatus: {},
+      pendingSuggestions: 0,
     });
+    expect(trend.every((day) => day.productsEnriched === 0 && day.exports === 0)).toBe(true);
   });
 });
 

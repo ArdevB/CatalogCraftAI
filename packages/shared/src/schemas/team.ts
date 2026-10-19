@@ -12,6 +12,8 @@ export const INVITATION_TTL_DAYS = 7;
 export const createInvitationSchema = z.object({
   email: emailSchema,
   role: assignableRoleSchema,
+  /** Also email the link (when the server can send email). */
+  sendEmail: z.boolean().default(true),
 });
 export type CreateInvitationInput = z.input<typeof createInvitationSchema>;
 
@@ -32,6 +34,8 @@ export type Invitation = z.infer<typeof invitationSchema>;
 export const createdInvitationSchema = z.object({
   invitation: invitationSchema,
   token: z.string(),
+  /** Whether the link was emailed to the invitee. */
+  emailed: z.boolean(),
 });
 export type CreatedInvitation = z.infer<typeof createdInvitationSchema>;
 

@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_BRAND_PROFILE, type Client, type Role } from '@catalogcraft/shared';
-import { fail, healthBody, jsonResponse, mockApi, ok, renderRoute, sessionInfo } from './utils';
+import { fail, mockApi, ok, renderRoute, sessionInfo } from './utils';
 
 function makeClient(overrides: Partial<Client> = {}): Client {
   return {
@@ -283,54 +283,5 @@ describe('editing a client', () => {
       internalReference: null,
       brandProfile: { prohibitedClaims: ['eco-friendly'], defaultLanguage: 'en-GB' },
     });
-  });
-});
-
-describe('dashboard', () => {
-  it('shows real client figures and recent clients', async () => {
-    mockApi({
-      'GET /me': session(),
-      'GET /health': () => jsonResponse(healthBody()),
-      'GET /dashboard/summary': () =>
-        ok({
-          plan: 'agency',
-          clients: { used: 2, limit: null },
-          recentClients: [{ id: 'e'.repeat(24), name: 'Recent Co', updatedAt: '2026-10-10T00:00:00.000Z' }],
-          products: { used: 120, limit: 2500 },
-          recentExports: [],
-          jobs: { active: 1, activeLimit: null, needsReview: 0, failed: 1 },
-          recentJobs: [
-            { id: 'f'.repeat(24), name: 'Spring import', status: 'failed', clientName: 'Recent Co', updatedAt: '2026-10-11T00:00:00.000Z' },
-          ],
-        }),
-    });
-    renderRoute('/dashboard');
-
-    expect(await screen.findByText('Unlimited on your plan')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
-    expect(screen.getByText('Agency plan')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Recent Co' })).toHaveAttribute('href', `/clients/${'e'.repeat(24)}`);
-    expect(screen.getByRole('link', { name: 'Spring import' })).toHaveAttribute('href', `/jobs/${'f'.repeat(24)}`);
-    expect(screen.getByText('Open the job to see why')).toBeInTheDocument();
-  });
-
-  it('invites owners to create their first client', async () => {
-    mockApi({
-      'GET /me': session(),
-      'GET /health': () => jsonResponse(healthBody()),
-      'GET /dashboard/summary': () => ok({
-          plan: 'trial',
-          clients: { used: 0, limit: 1 },
-          recentClients: [],
-          products: { used: 0, limit: 25 },
-          recentExports: [],
-          jobs: { active: 0, activeLimit: 1, needsReview: 0, failed: 0 },
-          recentJobs: [],
-        }),
-    });
-    renderRoute('/dashboard');
-
-    expect(await screen.findByRole('link', { name: 'Create your first client' })).toHaveAttribute('href', '/clients/new');
-    expect(screen.getByText('of 1 on your plan')).toBeInTheDocument();
   });
 });

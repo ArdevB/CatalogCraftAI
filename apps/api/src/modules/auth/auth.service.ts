@@ -5,6 +5,7 @@ import { MembershipModel } from '../memberships/membership.model.js';
 import { toOrganizationDto } from '../organizations/organization.dto.js';
 import { OrganizationModel } from '../organizations/organization.model.js';
 import { burnPasswordCheckTime, hashPassword, verifyPassword } from './password.js';
+import { EmailTokenModel } from './email-token.model.js';
 import { UserModel } from './user.model.js';
 
 const INVALID_CREDENTIALS = 'Invalid email or password.';
@@ -145,5 +146,6 @@ export async function deleteAccount(auth: AuthContext, password: string): Promis
     );
   }
   await MembershipModel.deleteMany({ userId: user._id });
+  await EmailTokenModel.deleteMany({ userId: user._id });
   await UserModel.deleteOne({ _id: user._id });
 }
