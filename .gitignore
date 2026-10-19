@@ -11,10 +11,10 @@ dist/
 !.env.example
 
 # Local file storage (uploads/exports in development)
-storage/
+/storage/
 
 # Backups (they contain customer data — keep them private, never in git)
-backups/
+/backups/
 
 # Logs
 *.log
