@@ -31,6 +31,8 @@ export class ApiError extends Error {
     message: string,
     readonly status: number | null,
     readonly details: ValidationIssueDetail[] = [],
+    /** Set on unexpected server errors; matches the server log line. */
+    readonly requestId: string | null = null,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -94,8 +96,8 @@ export async function apiRequest<T extends z.ZodType>(
   if (!response.ok) {
     const failure = apiErrorResponseSchema.safeParse(json);
     if (failure.success) {
-      const { code, message, details } = failure.data.error;
-      throw new ApiError(code, message, response.status, details);
+      const { code, message, details, requestId } = failure.data.error;
+      throw new ApiError(code, message, response.status, details, requestId ?? null);
     }
     throw new ApiError('INVALID_RESPONSE', `The API request failed (HTTP ${response.status}).`, response.status);
   }

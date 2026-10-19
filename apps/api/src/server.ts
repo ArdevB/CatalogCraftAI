@@ -6,8 +6,10 @@ import { ConfigError, loadConfig, type AppConfig } from './config/env.js';
 import { loadRootEnvFile } from './config/load-env-file.js';
 import { createLogger } from './config/logger.js';
 import { EnrichmentWorker } from './modules/enrichment/enrichment.worker.js';
+import { RetentionScheduler } from './modules/retention/retention.js';
 import { AnthropicProvider } from './services/ai/anthropic-provider.js';
-import { LocalFileStorage } from './services/storage/storage.js';
+import { createWebhookReporter } from './services/monitoring/error-alerts.js';
+import { createStorage } from './services/storage/storage.js';
 
 loadRootEnvFile();
 
@@ -39,17 +41,26 @@ const sessionStore = MongoStore.create({
   touchAfter: 5 * 60,
 });
 
-const storage = new LocalFileStorage(config.storageDir);
+const storage = createStorage(config);
+logger.info(`File storage: ${config.storage.driver === 's3' ? `S3 bucket "${config.storage.bucket}"` : config.storageDir}`);
 // AI is optional: without a key the app runs and AI features say they are not configured.
 const ai = config.ai.apiKey ? new AnthropicProvider({ ...config.ai, apiKey: config.ai.apiKey }) : null;
 if (!ai) logger.warn('AI enrichment is disabled: set AI_API_KEY in .env to enable it.');
 
-const app = createApp({ config, logger, sessionStore, storage, ai });
+const reportError = config.errorAlertWebhookUrl
+  ? createWebhookReporter({ webhookUrl: config.errorAlertWebhookUrl, environment: config.nodeEnv, logger })
+  : undefined;
+
+const app = createApp({ config, logger, sessionStore, storage, ai, reportError });
 
 // The enrichment worker starts once the database is connected.
 const worker = ai ? new EnrichmentWorker({ provider: ai, logger, concurrency: config.ai.concurrency }) : null;
+// Deletes expired export files every few hours (see EXPORT_RETENTION_DAYS).
+const retention = new RetentionScheduler({ storage, logger });
 void connected.then(() => {
-  if (worker && !shutdownController.signal.aborted) worker.start();
+  if (shutdownController.signal.aborted) return;
+  worker?.start();
+  retention.start();
 });
 
 const server = app.listen(config.port, () => {
@@ -65,6 +76,7 @@ server.on('error', (error) => {
 async function shutdown(signal: string): Promise<void> {
   logger.info(`${signal} received, shutting down`);
   shutdownController.abort();
+  retention.stop();
   // Let products already being enriched finish and save; others resume after restart.
   await worker?.stop();
   const forceExit = setTimeout(() => {
@@ -88,4 +100,11 @@ process.on('SIGINT', () => void shutdown('SIGINT'));
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('unhandledRejection', (reason) => {
   logger.error({ err: reason }, 'Unhandled promise rejection');
+  reportError?.({ message: `Unhandled promise rejection: ${reason instanceof Error ? reason.message : String(reason)}` });
+});
+// A crash leaves the process in an unknown state: log it, alert, and exit so the host restarts a clean one.
+process.on('uncaughtException', (error) => {
+  logger.fatal({ err: error }, 'Uncaught exception — exiting');
+  reportError?.({ message: `Crashed: ${error.message}` });
+  setTimeout(() => process.exit(1), 1_000).unref();
 });

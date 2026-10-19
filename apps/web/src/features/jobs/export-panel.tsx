@@ -1,6 +1,6 @@
 import { Download, FileDown, Loader2, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
-import { columnMappingSchema, STANDARD_FIELDS, type Job, type StandardField } from '@catalogcraft/shared';
+import { columnMappingSchema, EXPORT_RETENTION_DAYS, STANDARD_FIELDS, type Job, type StandardField } from '@catalogcraft/shared';
 import { ErrorState, errorMessage, LoadingState } from '@/components/page-states';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -98,6 +98,9 @@ export function ExportPanel({ job }: { job: Job }) {
 
         <div className="flex flex-col gap-2">
           <h3 className="text-sm font-medium">Previous exports</h3>
+          <p className="text-xs text-muted-foreground">
+            Files are kept for {EXPORT_RETENTION_DAYS} days, then deleted. Your reviewed data stays, so you can export again at any time.
+          </p>
           {exports.isPending ? (
             <LoadingState label="Loading exports…" />
           ) : exports.isError ? (
@@ -112,7 +115,8 @@ export function ExportPanel({ job }: { job: Job }) {
                     <span className="block truncate font-medium">{item.filename}</span>
                     <span className="text-muted-foreground">
                       {item.rowCount.toLocaleString()} rows · {item.changedCells.toLocaleString()} improved cells · {formatBytes(item.sizeBytes)} ·{' '}
-                      {item.createdBy.name}, {new Date(item.createdAt).toLocaleString()}
+                      {item.createdBy.name}, {new Date(item.createdAt).toLocaleString()} · kept until{' '}
+                      {new Date(item.expiresAt).toLocaleDateString()}
                     </span>
                   </span>
                   <Button asChild size="sm" variant="outline">

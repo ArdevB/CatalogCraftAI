@@ -22,12 +22,12 @@ export default tseslint.config(
     },
   },
   {
-    files: ['apps/api/**/*.ts', 'packages/shared/**/*.ts'],
+    files: ['apps/api/**/*.ts', 'packages/shared/**/*.ts', 'e2e/**/*.ts', '*.config.ts'],
     languageOptions: { globals: globals.node },
   },
   {
     // Command-line scripts talk to the developer through the console.
-    files: ['apps/api/src/scripts/**/*.ts'],
+    files: ['apps/api/src/scripts/**/*.ts', 'apps/api/tools/**/*.ts'],
     rules: { 'no-console': 'off' },
   },
   {

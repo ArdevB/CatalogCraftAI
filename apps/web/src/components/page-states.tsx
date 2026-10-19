@@ -19,7 +19,9 @@ export function LoadingState({ label = 'Loading…', fullPage = false }: { label
 }
 
 export function errorMessage(error: unknown): string {
-  return error instanceof ApiError ? error.message : 'An unexpected error occurred.';
+  if (!(error instanceof ApiError)) return 'An unexpected error occurred.';
+  // A reference lets support find the exact server log line for this failure.
+  return error.requestId ? `${error.message} (Reference: ${error.requestId})` : error.message;
 }
 
 export function ErrorState({

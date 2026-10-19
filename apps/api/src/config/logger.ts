@@ -30,3 +30,12 @@ export function createLogger(config: Pick<AppConfig, 'logLevel' | 'nodeEnv'>): L
       : {}),
   });
 }
+
+/**
+ * Invitation links carry their secret token in the URL path. Logs are read by
+ * more people (and tools) than the database, so request URLs are logged with
+ * the token removed.
+ */
+export function redactUrl(url: string | undefined): string | undefined {
+  return url?.replace(/\/invitations\/[A-Za-z0-9_-]{20,}/g, '/invitations/[token]');
+}

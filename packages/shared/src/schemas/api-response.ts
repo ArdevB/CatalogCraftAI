@@ -39,6 +39,8 @@ export const apiErrorBodySchema = z.object({
   code: errorCodeSchema,
   message: z.string(),
   details: z.array(validationIssueDetailSchema).optional(),
+  /** Present on unexpected server errors: matches the X-Request-Id header and the server log line. */
+  requestId: z.string().optional(),
 });
 export type ApiErrorBody = z.infer<typeof apiErrorBodySchema>;
 

@@ -22,6 +22,8 @@ const invitationSchema = new Schema(
 
 invitationSchema.index({ tokenHash: 1 }, { unique: true });
 invitationSchema.index({ organizationId: 1, email: 1, createdAt: -1 });
+// MongoDB deletes invitations by itself 30 days after they expire (used or not): no stale tokens or emails linger.
+invitationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
 
 export type Invitation = InferSchemaType<typeof invitationSchema>;
 export const InvitationModel = model('Invitation', invitationSchema);

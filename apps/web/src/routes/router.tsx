@@ -2,6 +2,7 @@ import { createBrowserRouter, type RouteObject } from 'react-router';
 import { RedirectIfAuthenticated, RequireAuth } from '@/features/auth/route-guards';
 import { AppLayout } from '@/layouts/app-layout';
 import { AuthenticatedLayout } from '@/layouts/authenticated-layout';
+import { AccountPage } from '@/pages/account-page';
 import { ClientDetailPage } from '@/pages/clients/client-detail-page';
 import { ClientEditPage } from '@/pages/clients/client-edit-page';
 import { ClientNewPage } from '@/pages/clients/client-new-page';
@@ -52,6 +53,7 @@ export const routes: RouteObject[] = [
               { path: 'jobs/:jobId', element: <JobPage /> },
               { path: 'usage', element: <UsagePage /> },
               { path: 'settings/organization', element: <OrganizationSettingsPage /> },
+              { path: 'settings/account', element: <AccountPage /> },
             ],
           },
         ],

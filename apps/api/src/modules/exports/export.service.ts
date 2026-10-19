@@ -1,7 +1,7 @@
 import type { Types } from 'mongoose';
 import type { z } from 'zod';
 import { stringify } from 'csv-stringify/sync';
-import { columnMappingSchema, statusesThatCanBecome, type ExportRecord, type exportRequestSchema, type JobStatus } from '@catalogcraft/shared';
+import { columnMappingSchema, EXPORT_RETENTION_DAYS, statusesThatCanBecome, type ExportRecord, type exportRequestSchema, type JobStatus } from '@catalogcraft/shared';
 import type { AuthContext } from '../../middleware/require-auth.js';
 import { buildExport } from '../../services/export/build-export.js';
 import { checksum, newExportKey, type FileStorage } from '../../services/storage/storage.js';
@@ -30,6 +30,8 @@ function slug(text: string): string {
   );
 }
 
+export const exportExpiry = (createdAt: Date) => new Date(createdAt.getTime() + EXPORT_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+
 export async function toExportDtos(exports: ExportDoc[]): Promise<ExportRecord[]> {
   const users = await UserModel.find({ _id: { $in: exports.map((item) => item.createdBy) } }).select('name').lean();
   const names = new Map(users.map((user) => [user._id.toString(), user.name]));
@@ -43,6 +45,7 @@ export async function toExportDtos(exports: ExportDoc[]): Promise<ExportRecord[]
     sizeBytes: item.sizeBytes,
     createdBy: { id: item.createdBy.toString(), name: names.get(item.createdBy.toString()) ?? 'Former member' },
     createdAt: item.createdAt.toISOString(),
+    expiresAt: exportExpiry(item.createdAt).toISOString(),
     downloadCount: item.downloadCount,
   }));
 }

@@ -41,6 +41,15 @@ export async function loadAuthContext(req: Request): Promise<AuthContext> {
     throw new AppError('UNAUTHENTICATED', 'Your session has ended. Please sign in again.');
   }
 
+  // Sessions started before a password change (or reset) end here.
+  const authVersion = user.authVersion ?? 0;
+  if (req.session.authVersion === undefined) {
+    req.session.authVersion = authVersion; // set on the request that signs in
+  } else if (req.session.authVersion !== authVersion) {
+    await destroySession(req);
+    throw new AppError('UNAUTHENTICATED', 'Your password was changed. Please sign in again.');
+  }
+
   let membership = organizationId ? await MembershipModel.findOne({ userId, organizationId }).lean() : null;
   if (!membership) {
     // Removed from the active organization: fall back to another one, if any.

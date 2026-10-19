@@ -52,6 +52,12 @@ export const updateOrganizationSchema = z
   .refine((input) => input.name !== undefined || input.contentRules !== undefined, { error: 'Nothing to update.' });
 export type UpdateOrganizationInput = z.input<typeof updateOrganizationSchema>;
 
+/** Deleting an organization is permanent, so the owner types its name to confirm. */
+export const deleteOrganizationSchema = z.object({
+  confirmName: z.string().trim().min(1, 'Type the organization name to confirm.').max(100),
+});
+export type DeleteOrganizationInput = z.infer<typeof deleteOrganizationSchema>;
+
 export const memberSchema = z.object({
   membershipId: z.string(),
   userId: z.string(),

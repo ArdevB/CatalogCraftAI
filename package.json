@@ -22,10 +22,16 @@
     "test": "npm run build:shared && npm run test --workspaces",
     "check": "npm run lint && npm run typecheck && npm run test",
     "seed": "npm run seed -w @catalogcraft/api",
-    "set-plan": "npm run set-plan -w @catalogcraft/api --"
+    "set-plan": "npm run set-plan -w @catalogcraft/api --",
+    "backup": "npm run backup -w @catalogcraft/api --",
+    "restore": "npm run restore -w @catalogcraft/api --",
+    "perf": "npm run build:shared && npm run perf -w @catalogcraft/api --",
+    "e2e": "playwright test",
+    "reset-password": "npm run reset-password -w @catalogcraft/api --"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.1",
     "concurrently": "^10.0.6",
     "eslint": "^10.13.0",
     "eslint-plugin-react-hooks": "^7.1.1",

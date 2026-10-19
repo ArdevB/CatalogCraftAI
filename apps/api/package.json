@@ -12,10 +12,16 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "seed": "tsx src/scripts/seed.ts",
-    "set-plan": "tsx src/scripts/set-plan.ts"
+    "set-plan": "tsx src/scripts/set-plan.ts",
+    "backup": "tsx src/scripts/backup.ts",
+    "restore": "tsx src/scripts/restore.ts",
+    "perf": "tsx tools/perf.ts",
+    "e2e:server": "tsx tools/e2e-server.ts",
+    "reset-password": "tsx src/scripts/reset-password.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
+    "@aws-sdk/client-s3": "^3.1152.0",
     "@catalogcraft/shared": "0.1.0",
     "@node-rs/argon2": "^2.2.2",
     "connect-mongo": "^6.0.0",

@@ -51,6 +51,9 @@ export const exportRequestSchema = z.object({
 });
 export type ExportRequestInput = z.input<typeof exportRequestSchema>;
 
+/** Export files are deleted this many days after they are made; the reviewed data stays, so you can export again. */
+export const EXPORT_RETENTION_DAYS = 30;
+
 export const exportSchema = z.object({
   id: z.string(),
   jobId: z.string(),
@@ -62,6 +65,8 @@ export const exportSchema = z.object({
   sizeBytes: z.number().int(),
   createdBy: z.object({ id: z.string(), name: z.string() }),
   createdAt: z.iso.datetime(),
+  /** When the file is deleted (see EXPORT_RETENTION_DAYS). */
+  expiresAt: z.iso.datetime(),
   downloadCount: z.number().int(),
 });
 export type ExportRecord = z.infer<typeof exportSchema>;

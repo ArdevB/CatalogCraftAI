@@ -50,11 +50,24 @@ const envSchema = z.object({
     }),
   SESSION_TTL_HOURS: z.coerce.number().min(1).max(24 * 30).default(72),
 
+  STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
   STORAGE_LOCAL_DIR: z.string().trim().min(1).default('./storage'),
+  S3_BUCKET: z.string().trim().optional(),
+  S3_REGION: z.string().trim().default('auto'),
+  S3_ENDPOINT: z.url({ protocol: /^https?$/, error: 'S3_ENDPOINT must be an http(s) URL.' }).optional(),
+  S3_ACCESS_KEY_ID: z.string().trim().optional(),
+  S3_SECRET_ACCESS_KEY: z.string().trim().optional(),
+  S3_FORCE_PATH_STYLE: z.stringbool().default(false),
+
+  /** Optional: serve the built web app from the API (one service, same origin). */
+  WEB_DIST_DIR: z.string().trim().optional(),
   UPLOAD_MAX_MB: z.coerce.number().min(1).max(50).default(10),
   IMPORT_MAX_ROWS: z.coerce.number().int().min(1).max(50_000).default(2_000),
 
   /** Optional: without a key the app runs, and AI features explain they are not configured. */
+  /** Optional Slack/Discord incoming-webhook URL for error alerts. */
+  ERROR_ALERT_WEBHOOK_URL: z.url({ protocol: /^https$/, error: 'ERROR_ALERT_WEBHOOK_URL must be an https URL.' }).optional(),
+
   AI_API_KEY: z.string().trim().optional(),
   ANTHROPIC_API_KEY: z.string().trim().optional(),
   AI_MODEL: z.string().trim().min(1).default('claude-opus-5-5'),
@@ -63,6 +76,11 @@ const envSchema = z.object({
   AI_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(600_000).default(90_000),
   AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
   AI_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(3),
+}).superRefine((env, ctx) => {
+  if (env.STORAGE_DRIVER !== 's3') return;
+  for (const key of ['S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'] as const) {
+    if (!env[key]) ctx.addIssue({ code: 'custom', path: [key], message: `${key} is required when STORAGE_DRIVER=s3.` });
+  }
 });
 
 /** Repository root (this file lives in apps/api/{src,dist}/config). */
@@ -80,6 +98,21 @@ export type AppConfig = Readonly<{
   session: Readonly<{ secret: string; ttlMs: number }>;
   /** Absolute directory for private files (uploads, exports). Never served directly. */
   storageDir: string;
+  storage: Readonly<
+    | { driver: 'local' }
+    | {
+        driver: 's3';
+        bucket: string;
+        region: string;
+        endpoint: string | undefined;
+        accessKeyId: string;
+        secretAccessKey: string;
+        forcePathStyle: boolean;
+      }
+  >;
+  errorAlertWebhookUrl: string | null;
+  /** Absolute path of the built web app to serve, or `null` when the web app is hosted separately. */
+  webDistDir: string | null;
   imports: Readonly<{ maxUploadBytes: number; maxRows: number }>;
   ai: Readonly<{
     /** `null` when no key is configured: AI features are then disabled. */
@@ -128,6 +161,21 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     }),
     session: Object.freeze({ secret: env.SESSION_SECRET, ttlMs: env.SESSION_TTL_HOURS * 60 * 60 * 1000 }),
     storageDir: path.resolve(REPO_ROOT, env.STORAGE_LOCAL_DIR),
+    storage: Object.freeze(
+      env.STORAGE_DRIVER === 's3'
+        ? {
+            driver: 's3' as const,
+            bucket: env.S3_BUCKET!,
+            region: env.S3_REGION,
+            endpoint: env.S3_ENDPOINT,
+            accessKeyId: env.S3_ACCESS_KEY_ID!,
+            secretAccessKey: env.S3_SECRET_ACCESS_KEY!,
+            forcePathStyle: env.S3_FORCE_PATH_STYLE,
+          }
+        : { driver: 'local' as const },
+    ),
+    errorAlertWebhookUrl: env.ERROR_ALERT_WEBHOOK_URL ?? null,
+    webDistDir: env.WEB_DIST_DIR ? path.resolve(REPO_ROOT, env.WEB_DIST_DIR) : null,
     imports: Object.freeze({ maxUploadBytes: Math.round(env.UPLOAD_MAX_MB * 1024 * 1024), maxRows: env.IMPORT_MAX_ROWS }),
     ai: Object.freeze({
       apiKey: env.AI_API_KEY || env.ANTHROPIC_API_KEY || null,

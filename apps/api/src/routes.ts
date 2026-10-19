@@ -5,7 +5,7 @@ import type { AppConfig } from './config/env.js';
 import { sessionMiddleware } from './config/session.js';
 import { csrfProtection } from './middleware/csrf.js';
 import { requireDatabase } from './middleware/require-database.js';
-import { authRouter, meHandler } from './modules/auth/auth.routes.js';
+import { authRouter, deleteAccountHandler, meHandler } from './modules/auth/auth.routes.js';
 import { jobsRouter } from './modules/catalog-jobs/catalog-job.routes.js';
 import { clientsRouter } from './modules/clients/client.routes.js';
 import { dashboardRouter } from './modules/dashboard/dashboard.routes.js';
@@ -43,7 +43,8 @@ export function apiV1Router(deps: RouteDependencies): Router {
 
   router.use('/auth', authRouter(deps.config));
   router.get('/me', meHandler);
-  router.use('/organizations', organizationsRouter());
+  router.delete('/me', deleteAccountHandler(deps.config));
+  router.use('/organizations', organizationsRouter(deps.storage));
   router.use('/organizations/current', teamRouter());
   router.use('/invitations', invitationsRouter(deps.config));
   router.use('/clients', clientsRouter());

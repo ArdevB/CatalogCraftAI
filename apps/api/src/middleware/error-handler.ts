@@ -1,5 +1,6 @@
 import type { ErrorRequestHandler, RequestHandler } from 'express';
 import type { ErrorCode } from '@catalogcraft/shared';
+import type { ErrorReporter } from '../services/monitoring/error-alerts.js';
 import { AppError } from '../utils/app-error.js';
 import { sendError } from '../utils/http-response.js';
 
@@ -24,34 +25,45 @@ function bodyParserErrorType(error: unknown): string | undefined {
  * - `AppError`s are expected and their message is shown to the user.
  * - Anything else is a bug: we log the full error server-side (with the
  *   request id for tracing) but return a generic message, so stack traces and
- *   internals never reach the browser.
+ *   internals never reach the browser. The response carries the request id,
+ *   so a user can quote it and the matching log line is easy to find.
  *
  * Express 5 forwards rejected promises from async handlers here automatically.
  */
-export const errorHandler: ErrorRequestHandler = (error: unknown, req, res, next) => {
-  if (res.headersSent) {
-    next(error);
-    return;
-  }
-
-  if (error instanceof AppError) {
-    // "Database down" and "AI not configured" are known operating conditions:
-    // one warning line each, not an error with a stack trace per request.
-    if (EXPECTED_UNAVAILABLE.has(error.code)) req.log.warn({ code: error.code }, error.message);
-    else if (error.statusCode >= 500) req.log.error({ err: error }, error.message);
-    sendError(res, error.statusCode, error.code, error.message, error.details);
-    return;
-  }
-
-  switch (bodyParserErrorType(error)) {
-    case 'entity.parse.failed':
-      sendError(res, 400, 'INVALID_JSON', 'The request body is not valid JSON.');
+export function createErrorHandler(report?: ErrorReporter): ErrorRequestHandler {
+  return (error: unknown, req, res, next) => {
+    if (res.headersSent) {
+      next(error);
       return;
-    case 'entity.too.large':
-      sendError(res, 413, 'PAYLOAD_TOO_LARGE', 'The request body is too large.');
-      return;
-  }
+    }
+    const requestId = String(req.id);
+    const route = `${req.method} ${req.baseUrl}${req.path}`;
 
-  req.log.error({ err: error }, 'Unhandled error');
-  sendError(res, 500, 'INTERNAL_ERROR', 'Something went wrong on our side. Please try again.');
-};
+    if (error instanceof AppError) {
+      // "Database down" and "AI not configured" are known operating conditions:
+      // one warning line each, not an error with a stack trace per request.
+      if (EXPECTED_UNAVAILABLE.has(error.code)) req.log.warn({ code: error.code }, error.message);
+      else if (error.statusCode >= 500) {
+        req.log.error({ err: error }, error.message);
+        report?.({ message: error.message, requestId, route });
+      }
+      sendError(res, error.statusCode, error.code, error.message, error.details, error.statusCode >= 500 ? requestId : undefined);
+      return;
+    }
+
+    switch (bodyParserErrorType(error)) {
+      case 'entity.parse.failed':
+        sendError(res, 400, 'INVALID_JSON', 'The request body is not valid JSON.');
+        return;
+      case 'entity.too.large':
+        sendError(res, 413, 'PAYLOAD_TOO_LARGE', 'The request body is too large.');
+        return;
+    }
+
+    req.log.error({ err: error }, 'Unhandled error');
+    report?.({ message: error instanceof Error ? `${error.name}: ${error.message}` : 'Unhandled error', requestId, route });
+    sendError(res, 500, 'INTERNAL_ERROR', 'Something went wrong on our side. Please try again.', undefined, requestId);
+  };
+}
+
+export const errorHandler: ErrorRequestHandler = createErrorHandler();

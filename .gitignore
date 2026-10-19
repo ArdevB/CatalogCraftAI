@@ -13,6 +13,9 @@ dist/
 # Local file storage (uploads/exports in development)
 storage/
 
+# Backups (they contain customer data — keep them private, never in git)
+backups/
+
 # Logs
 *.log
 npm-debug.log*

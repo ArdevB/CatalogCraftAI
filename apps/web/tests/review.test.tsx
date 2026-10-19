@@ -88,6 +88,7 @@ const exportRecord: ExportRecord = {
   sizeBytes: 120,
   createdBy: { id: 'u1', name: 'Ada Lovelace' },
   createdAt: '2026-10-18T10:10:00.000Z',
+  expiresAt: '2026-11-17T10:10:00.000Z',
   downloadCount: 0,
 };
 

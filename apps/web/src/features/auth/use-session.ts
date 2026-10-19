@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   hasPermission,
   sessionInfoSchema,
+  type ChangePasswordInput,
   type LoginInput,
   type Permission,
   type RegisterInput,
@@ -56,6 +57,13 @@ export function useRegister() {
     mutationFn: (input: RegisterInput) =>
       apiRequest('/auth/register', sessionInfoSchema, { method: 'POST', body: input }),
     onSuccess: (session) => queryClient.setQueryData(sessionQueryKey, session),
+  });
+}
+
+/** Changes the password; the API signs out every other device and keeps this session. */
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (input: ChangePasswordInput) => apiRequest('/auth/change-password', z.null(), { method: 'POST', body: input }),
   });
 }
 

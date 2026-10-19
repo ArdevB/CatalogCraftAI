@@ -13,8 +13,11 @@ export function sendError(
   code: ErrorCode,
   message: string,
   details?: ValidationIssueDetail[],
+  /** Only for unexpected errors, so the user can quote it to support. */
+  requestId?: string,
 ): void {
   const body: ApiErrorResponse = { success: false, error: { code, message } };
   if (details && details.length > 0) body.error.details = details;
+  if (requestId) body.error.requestId = requestId;
   res.status(status).json(body);
 }

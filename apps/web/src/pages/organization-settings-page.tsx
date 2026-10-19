@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { applyServerFieldErrors } from '@/features/auth/apply-server-errors';
 import { usePermission, useRequiredSession } from '@/features/auth/use-session';
 import { ContentRulesCard } from '@/features/organization/content-rules-card';
+import { DeleteOrganizationCard } from '@/features/organization/delete-organization-card';
 import { useUpdateOrganization } from '@/features/organization/use-organization';
 import { InviteCard } from '@/features/team/invite-card';
 import { MembersCard } from '@/features/team/members-card';
@@ -86,6 +87,7 @@ function OrganizationDetailsCard() {
 
 export function OrganizationSettingsPage() {
   const canManageTeam = usePermission('members:manage');
+  const canDelete = usePermission('organization:delete');
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold tracking-tight">Organization settings</h1>
@@ -94,6 +96,7 @@ export function OrganizationSettingsPage() {
         <div className="flex flex-col gap-6">
           <OrganizationDetailsCard />
           <ContentRulesCard />
+          {canDelete ? <DeleteOrganizationCard /> : null}
         </div>
         <div className="flex flex-col gap-6">
           <MembersCard />

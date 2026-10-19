@@ -27,6 +27,7 @@ const exportSchema = new Schema(
 
 exportSchema.index({ organizationId: 1, jobId: 1, createdAt: -1 });
 exportSchema.index({ organizationId: 1, createdAt: -1 });
+exportSchema.index({ createdAt: 1 }); // the retention sweep finds old exports across all organizations
 
 export type Export = InferSchemaType<typeof exportSchema>;
 export const ExportModel = model('Export', exportSchema);

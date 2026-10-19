@@ -2,7 +2,7 @@
 
 Multi-tenant SaaS for ecommerce agencies: import messy supplier catalogues (CSV/XLSX), validate them, generate AI suggestions for selected fields, review every change, and export a clean CSV — with product facts and protected fields (SKU, price, stock, barcodes…) never altered by AI.
 
-> **Status: Phase 5 (Agency workflow) complete.** The full CSV workflow works end to end — import a supplier file, validate it, generate AI suggestions, review them and export a clean CSV with protected values untouched — and agencies can now invite their team with one-time links, manage roles, switch between organizations and set content rules for every client. Remaining: Phase 6 pilot readiness — see [Roadmap](#roadmap).
+> **Status: MVP complete and pilot-ready (Phase 6).** The full CSV workflow works end to end and is covered by browser tests; agencies can invite their team, manage roles and set content rules; organizations and accounts can be deleted; and there are guides for [deployment and operations](docs/DEPLOYMENT.md), the [security review](docs/SECURITY.md) and [pilot user acceptance testing](docs/PILOT-UAT.md).
 
 ---
 
@@ -22,23 +22,26 @@ Multi-tenant SaaS for ecommerce agencies: import messy supplier catalogues (CSV/
 apps/
   api/          Express REST API
     src/
-      config/       env validation, logger, database connection
-      middleware/   error handling, security (headers, CORS, rate limit)
-      middleware/   error handling, security, CSRF, requireAuth / requirePermission
-      modules/      one folder per feature: auth, organizations, memberships, health
-      scripts/      seed script
-      utils/        AppError, response helpers, request validation, tenantScope
+      config/       env validation, logger, database connection, plans, sessions
+      middleware/   errors, security headers/CORS/rate limits, CSRF, auth & permissions, serving the web app
+      modules/      one folder per feature: auth, organizations, team, clients, catalog-jobs, catalog-rows,
+                    enrichment, review, exports, usage, audit, retention, dashboard, health
+      services/     ai, import, validation, export, storage (local / S3), backup, monitoring
+      scripts/      seed, set-plan, backup, restore, reset-password
       app.ts        builds the Express app (used by tests)
-      server.ts     starts HTTP server + MongoDB connection + session store
+      server.ts     starts HTTP server, MongoDB, AI worker and retention sweep
     tests/          API tests (run against a throwaway in-memory MongoDB)
+    tools/          local test stack, end-to-end server and performance script (never deployed)
   web/          React single-page app
     src/
       components/     shadcn-style primitives (ui/) and shared form/page-state components
-      features/       auth, organization, system status
+      features/       auth, clients, jobs, organization, team, onboarding, system status
       layouts/ pages/ routes/ lib/
     tests/
 packages/
-  shared/       Zod schemas shared by API and web (auth, roles & permissions, organizations, responses…)
+  shared/       Zod schemas shared by API and web (auth, roles & permissions, organizations, catalogue, review…)
+e2e/            Playwright browser tests
+docs/           deployment & operations, security review, pilot acceptance testing
 ```
 
 ## Prerequisites
@@ -81,8 +84,13 @@ Then open <http://localhost:5173> and **Create an account** (or sign in with the
 | `npm run check`     | lint + typecheck + test |
 | `npm run seed`      | Create the synthetic demo account `demo@catalogcraft.test` (Agency plan) and a sample client (safe to re-run; refuses in production) |
 | `npm run set-plan -- <owner-email> <plan>` | Manually change an organization's plan (`trial`, `solo`, `agency`, `studio`) — for pilot customers, since there is no payment integration |
+| `npm run e2e` | Browser end-to-end tests (Playwright, using your installed Chrome) against a throwaway stack with a scripted AI |
+| `npm run perf -- [--rows N] [--ai-ms N]` | Times the whole workflow on synthetic data (default 2,000 products) |
+| `npm run backup -- [folder]` | Back up the database and stored files (see [operations](docs/DEPLOYMENT.md#operations)) |
+| `npm run restore -- <folder>` | Restore a backup into an **empty** database and verify it |
+| `npm run reset-password -- <email>` | Give a user a temporary password and sign them out everywhere |
 
-API tests start a throwaway MongoDB automatically (`mongodb-memory-server`), so they never touch your real database. The **first** test run downloads a MongoDB binary (~800 MB, cached afterwards).
+None of the tests, `npm run e2e` or `npm run perf` call a real AI service or touch your database. API tests start a throwaway MongoDB automatically (`mongodb-memory-server`), so they never touch your real database. The **first** test run downloads a MongoDB binary (~800 MB, cached afterwards).
 
 ## Configuration
 
@@ -95,7 +103,11 @@ All settings come from environment variables, validated at startup by [`apps/api
 | `SESSION_TTL_HOURS` | no | `72` | Sessions end after this many hours of inactivity |
 | `AUTH_RATE_LIMIT_MAX` | no | `10` | Failed login/registration attempts per IP per rate-limit window |
 | `SEED_DEMO_PASSWORD` | no | generated | Password for the seeded demo account |
+| `STORAGE_DRIVER` | no | `local` | `local` (a folder) or `s3` (a private S3-compatible bucket: Cloudflare R2, Backblaze B2, AWS S3) |
 | `STORAGE_LOCAL_DIR` | no | `./storage` | Private folder for uploaded files (relative to the repo root, or absolute) |
+| `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | with `s3` | region `auto` | Bucket settings for `STORAGE_DRIVER=s3` |
+| `WEB_DIST_DIR` | no | – | Serve the built web app from the API (one service, one origin), e.g. `./apps/web/dist` |
+| `ERROR_ALERT_WEBHOOK_URL` | no | – | Slack/Discord webhook for unexpected-error alerts |
 | `UPLOAD_MAX_MB` | no | `10` | Maximum upload size |
 | `IMPORT_MAX_ROWS` | no | `2000` | Maximum product rows per job |
 | `AI_API_KEY` | no | – | Anthropic API key. Without it, AI features report "not configured" (never fake results). `ANTHROPIC_API_KEY` is also accepted. |
@@ -137,9 +149,12 @@ State-changing requests (`POST`/`PUT`/`PATCH`/`DELETE`) must include the header 
 | POST | `/api/v1/auth/login` | – | `{ email, password }` → signs in. Generic `401` for any wrong email/password. |
 | POST | `/api/v1/auth/logout` | – | Deletes the session server-side and clears the cookie. |
 | GET | `/api/v1/me` | signed in | Current user, active organization, role and permissions. |
+| DELETE | `/api/v1/me` | signed in | `{ password }` — deletes your account and memberships. `409` while you own an organization. |
+| POST | `/api/v1/auth/change-password` | signed in | `{ currentPassword, newPassword }` — keeps this session, signs out all others. |
 | GET | `/api/v1/organizations/current` | `organization:read` | The active organization. |
 | POST | `/api/v1/auth/switch-organization` | signed in | `{ organizationId }` — switch the active organization. `404` unless you are a member. |
 | PATCH | `/api/v1/organizations/current` | `organization:update` | `{ name?, contentRules?: { prohibitedClaims } }` — rename, or set the agency-wide content rules (owner, admin). |
+| DELETE | `/api/v1/organizations/current` | `organization:delete` | `{ confirmName }` (the exact name) — permanently deletes the organization and everything it owns. Returns your session in another organization, or `null`. |
 | GET | `/api/v1/organizations/current/members` | `members:read` | Members and their roles. |
 | PATCH | `/api/v1/organizations/current/members/:membershipId` | `members:manage` | `{ role }` (admin/editor/reviewer). The owner and your own role can't be changed; only the owner grants or manages admins. |
 | DELETE | `/api/v1/organizations/current/members/:membershipId` | signed in | Remove a member (owner/admin, same rules as above), or leave by removing yourself (not the owner). Takes effect on their next request. |
@@ -303,14 +318,18 @@ Try a small job on each and compare the copy before choosing. Set a monthly spen
 | `npm warn install-scripts … esbuild` during install | npm 11+ blocks install scripts by default. esbuild's script only verifies its binary; the project works without it. |
 | Atlas password contains `@`, `:` or `/` | URL-encode it in `MONGODB_URI` (e.g. `@` → `%40`). |
 
-## Deployment (outline)
+## Deployment and operations
 
-Full deployment docs come with pilot readiness (Phase 6). The shape will be:
+See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**. It covers:
 
-- **Web:** `npm run build`, deploy `apps/web/dist` to Vercel (or similar) with an SPA rewrite to `index.html`. Set `VITE_API_BASE_URL` if the API is on a different domain.
-- **API:** any Node host (Render, Railway, Fly.io…). Build with `npm run build`, start with `npm start`. Set `NODE_ENV=production`, `MONGODB_URI`, `SESSION_SECRET` (a new one, not your local value), `WEB_ORIGIN`, `TRUST_PROXY_HOPS=1`. Use `/api/v1/health` as the liveness check. Secure cookies require HTTPS. Simplest setup: serve the web app and API from the same site (e.g. a Vercel rewrite of `/api/*` to the API) so cookies stay first-party.
-- **Rate limits** are kept in memory per API instance — fine for one instance; use a shared store (e.g. Redis) before running several.
-- **Database:** MongoDB Atlas.
+- a free single-service setup (Render, MongoDB Atlas and Cloudflare R2), and its limits;
+- backups and restore drills;
+- password resets, monitoring and alerts;
+- data retention and upgrades.
+
+The security review is in **[docs/SECURITY.md](docs/SECURITY.md)**, and the pilot acceptance checklist is in **[docs/PILOT-UAT.md](docs/PILOT-UAT.md)**.
+
+The same checks run on every push via GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): lint, type-check, all tests, the build, and the browser tests.
 
 ## Roadmap
 
@@ -321,4 +340,5 @@ Full deployment docs come with pilot readiness (Phase 6). The shape will be:
 - [x] **Phase 3 — AI enrichment:** provider abstraction (Anthropic), versioned prompt, structured & validated output, guardrails, background worker with leases and cancellation, usage ledger, monthly limits, usage page
 - [x] **Phase 4 — Review & export:** review table with approve/edit/reject/undo, bulk approve (warning-free only), audit log & activity, safe CSV export with authorised downloads, recent exports on the dashboard
 - [x] **Phase 5 — Agency workflow:** team invitations by shareable one-time link, role changes / removal / leaving, plan user limits, organization switcher, agency-wide content rules, getting-started checklist, plan-limits table
-- [ ] **Phase 6 — Pilot readiness:** browser end-to-end tests (Playwright), security review, deployment guide, data retention & account/organization deletion policy, optional email delivery for invitations
+- [x] **Phase 6 — Pilot readiness:** Playwright end-to-end tests, security review and fixes, organization/account deletion, password change and reset, data retention, S3-compatible storage, single-service deployment, error references and alerts, backup/restore with verification, performance script, CI, deployment and acceptance-testing guides
+- [ ] **Next (after pilot feedback):** email delivery (verification, password reset, invitations), two-factor authentication, payments, Shopify integration — only once the CSV workflow is validated by customers (spec §15)

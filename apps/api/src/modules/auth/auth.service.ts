@@ -100,3 +100,50 @@ export async function buildSessionInfo(auth: AuthContext): Promise<SessionInfo> 
       })),
   };
 }
+
+/** Checks the signed-in user's password; a wrong one is a field error, never a sign-out. */
+async function confirmPassword(userId: string, password: string, field: string) {
+  const user = await UserModel.findById(userId).select('+passwordHash').lean();
+  if (!user) throw new AppError('UNAUTHENTICATED', 'Your session has ended. Please sign in again.');
+  if (!(await verifyPassword(user.passwordHash, password))) {
+    throw new AppError('VALIDATION_ERROR', 'That password is not correct.', {
+      details: [{ path: `body.${field}`, message: 'That password is not correct.' }],
+    });
+  }
+  return user;
+}
+
+/**
+ * Sets a new password and increases `authVersion`, which signs out every
+ * other session. Returns the new version for the caller's fresh session.
+ */
+export async function changePassword(auth: AuthContext, currentPassword: string, newPassword: string): Promise<number> {
+  await confirmPassword(auth.userId, currentPassword, 'currentPassword');
+  const updated = await UserModel.findByIdAndUpdate(
+    auth.userId,
+    { $set: { passwordHash: await hashPassword(newPassword) }, $inc: { authVersion: 1 } },
+    { returnDocument: 'after' },
+  ).lean();
+  if (!updated) throw new AppError('UNAUTHENTICATED', 'Your session has ended. Please sign in again.');
+  return updated.authVersion;
+}
+
+/**
+ * Permanently deletes the signed-in user's account and memberships. Refused
+ * while they own an organization, so no agency is ever left without an owner:
+ * they delete the organization first. Jobs, exports and audit entries they
+ * created stay with the organization and show "Former member".
+ */
+export async function deleteAccount(auth: AuthContext, password: string): Promise<void> {
+  const user = await confirmPassword(auth.userId, password, 'password');
+  const owned = await MembershipModel.find({ userId: user._id, role: 'owner' }).select('organizationId').lean();
+  if (owned.length > 0) {
+    const names = await OrganizationModel.find({ _id: { $in: owned.map((m) => m.organizationId) } }).select('name').lean();
+    throw new AppError(
+      'CONFLICT',
+      `You own ${names.map((o) => `“${o.name}”`).join(', ')}. Delete ${owned.length === 1 ? 'that organization' : 'those organizations'} first (Organization settings → Delete organization).`,
+    );
+  }
+  await MembershipModel.deleteMany({ userId: user._id });
+  await UserModel.deleteOne({ _id: user._id });
+}

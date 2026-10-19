@@ -66,3 +66,13 @@ export type SessionInfo = z.infer<typeof sessionInfoSchema>;
  */
 export const CSRF_HEADER = 'X-CatalogCraft-Request';
 export const CSRF_HEADER_VALUE = '1';
+
+/** Deleting your account asks for your password again, so an unattended signed-in browser can't do it. */
+export const deleteAccountSchema = z.object({ password: loginSchema.shape.password });
+export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
+
+export const changePasswordSchema = z.object({
+  currentPassword: loginSchema.shape.password,
+  newPassword: passwordSchema,
+});
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

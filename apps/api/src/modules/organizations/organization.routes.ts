@@ -1,12 +1,16 @@
 import { Router } from 'express';
-import { updateOrganizationSchema, type Member } from '@catalogcraft/shared';
-import { getAuth, requireAuth, requirePermission } from '../../middleware/require-auth.js';
+import { deleteOrganizationSchema, updateOrganizationSchema, type Member, type SessionInfo } from '@catalogcraft/shared';
+import type { Request } from 'express';
+import { getAuth, loadAuthContext, requireAuth, requirePermission } from '../../middleware/require-auth.js';
+import type { FileStorage } from '../../services/storage/storage.js';
 import { AppError } from '../../utils/app-error.js';
 import { sendSuccess } from '../../utils/http-response.js';
 import { tenantScope } from '../../utils/tenant.js';
 import { validateRequest } from '../../utils/validate-request.js';
+import { buildSessionInfo } from '../auth/auth.service.js';
 import { UserModel } from '../auth/user.model.js';
 import { MembershipModel } from '../memberships/membership.model.js';
+import { deleteOrganization } from './organization-deletion.js';
 import { toOrganizationDto } from './organization.dto.js';
 import { OrganizationModel } from './organization.model.js';
 
@@ -15,7 +19,17 @@ import { OrganizationModel } from './organization.model.js';
  * There is deliberately no `/organizations/:id` route, so there is no id in
  * the URL for anyone to swap for another agency's.
  */
-export function organizationsRouter(): Router {
+/** After losing an organization: the session moves to another one, or ends (`null`). */
+async function sessionAfterLeaving(req: Request): Promise<SessionInfo | null> {
+  try {
+    return await buildSessionInfo(await loadAuthContext(req));
+  } catch (error) {
+    if (error instanceof AppError && error.code === 'UNAUTHENTICATED') return null;
+    throw error;
+  }
+}
+
+export function organizationsRouter(storage: FileStorage): Router {
   const router = Router();
   router.use(requireAuth);
 
@@ -41,6 +55,15 @@ export function organizationsRouter(): Router {
     ).lean();
     if (!organization) throw new AppError('NOT_FOUND', 'Organization not found.');
     sendSuccess(res, toOrganizationDto(organization), { message: 'Organization updated.' });
+  });
+
+  // Owner only. Everything the organization owns is deleted; user accounts are kept.
+  router.delete('/current', requirePermission('organization:delete'), async (req, res) => {
+    const auth = getAuth(req);
+    const { body } = validateRequest(req, { body: deleteOrganizationSchema });
+    await deleteOrganization(storage, auth, body.confirmName);
+    req.log.info({ organizationId: auth.organizationId }, 'Organization deleted');
+    sendSuccess(res, await sessionAfterLeaving(req), { message: 'Organization deleted.' });
   });
 
   router.get('/current/members', requirePermission('members:read'), async (req, res) => {

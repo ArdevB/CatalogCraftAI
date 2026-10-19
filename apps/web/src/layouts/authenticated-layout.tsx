@@ -14,6 +14,7 @@ const NAV_ITEMS: Array<{ to: string; label: string; permission?: Permission }> =
   { to: '/jobs', label: 'Jobs' },
   { to: '/usage', label: 'Usage', permission: 'usage:read' },
   { to: '/settings/organization', label: 'Organization' },
+  { to: '/settings/account', label: 'Account' },
 ];
 
 /** For people in more than one agency: switches the whole app to another organization. */

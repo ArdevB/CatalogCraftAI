@@ -7,6 +7,8 @@ declare module 'express-session' {
     userId: string;
     /** The organization the user is currently working in. Re-verified on every request. */
     organizationId: string;
+    /** The user's `authVersion` when this session started; a password change makes it stale. */
+    authVersion?: number;
   }
 }
 
