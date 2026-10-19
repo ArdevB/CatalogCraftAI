@@ -1,5 +1,12 @@
 import { model, Schema, type InferSchemaType } from 'mongoose';
-import { ISSUE_SEVERITIES, ISSUE_TYPES, ROW_STATUSES } from '@catalogcraft/shared';
+import {
+  ENRICHABLE_FIELD_KEYS,
+  ISSUE_SEVERITIES,
+  ISSUE_TYPES,
+  ROW_ENRICHMENT_STATUSES,
+  ROW_STATUSES,
+  SUGGESTION_STATUSES,
+} from '@catalogcraft/shared';
 
 const validationIssueSchema = new Schema(
   {
@@ -7,6 +14,30 @@ const validationIssueSchema = new Schema(
     type: { type: String, enum: ISSUE_TYPES, required: true },
     severity: { type: String, enum: ISSUE_SEVERITIES, required: true },
     message: { type: String, required: true },
+  },
+  { _id: false },
+);
+
+/** An AI suggestion for one field. Never stored in `original`. */
+const suggestionSchema = new Schema(
+  {
+    field: { type: String, enum: ENRICHABLE_FIELD_KEYS, required: true },
+    value: { type: String, required: true, maxlength: 10_000 },
+    status: { type: String, enum: SUGGESTION_STATUSES, required: true },
+    warnings: { type: [String], default: [] },
+    model: { type: String, required: true },
+    promptVersion: { type: String, required: true },
+    generatedAt: { type: Date, required: true },
+  },
+  { _id: false },
+);
+
+const rowEnrichmentSchema = new Schema(
+  {
+    status: { type: String, enum: ROW_ENRICHMENT_STATUSES, required: true },
+    error: { type: String, default: null },
+    missingFacts: { type: [String], default: [] },
+    notes: { type: [String], default: [] },
   },
   { _id: false },
 );
@@ -33,6 +64,8 @@ const catalogRowSchema = new Schema(
     sourceIdentifier: { type: String, default: null },
     status: { type: String, enum: ROW_STATUSES, required: true },
     validationIssues: { type: [validationIssueSchema], default: [] },
+    suggestions: { type: [suggestionSchema], default: [] },
+    enrichment: { type: rowEnrichmentSchema, default: null },
   },
   { timestamps: true, minimize: false },
 );
@@ -40,6 +73,8 @@ const catalogRowSchema = new Schema(
 catalogRowSchema.index({ jobId: 1, rowNumber: 1 }, { unique: true });
 catalogRowSchema.index({ organizationId: 1, jobId: 1, status: 1, rowNumber: 1 });
 catalogRowSchema.index({ jobId: 1, sourceIdentifier: 1 });
+// The enrichment worker fetches the next queued rows of a job in order.
+catalogRowSchema.index({ jobId: 1, 'enrichment.status': 1, rowNumber: 1 });
 
 export type CatalogRow = InferSchemaType<typeof catalogRowSchema>;
 export const CatalogRowModel = model('CatalogRow', catalogRowSchema);

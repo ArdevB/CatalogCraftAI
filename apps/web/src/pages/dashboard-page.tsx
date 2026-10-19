@@ -38,10 +38,10 @@ function Summary() {
     );
   }
 
-  const { clients, plan, recentClients, jobs, recentJobs } = summary.data;
+  const { clients, plan, recentClients, jobs, recentJobs, products } = summary.data;
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Stat
           label="Client workspaces"
           value={String(clients.used)}
@@ -51,6 +51,11 @@ function Summary() {
           label="Active jobs"
           value={String(jobs.active)}
           detail={jobs.activeLimit === null ? `${PLAN_LABELS[plan]} plan` : `of ${jobs.activeLimit} at a time · ${PLAN_LABELS[plan]} plan`}
+        />
+        <Stat
+          label="Products enriched this month"
+          value={products.used.toLocaleString()}
+          detail={products.limit === null ? 'Unlimited on your plan' : `of ${products.limit.toLocaleString()} on your plan`}
         />
         <Stat label="Jobs needing review" value={String(jobs.needsReview)} />
         <Stat label="Failed jobs" value={String(jobs.failed)} detail={jobs.failed > 0 ? 'Open the job to see why' : undefined} />

@@ -1,6 +1,9 @@
 import type { ErrorRequestHandler, RequestHandler } from 'express';
+import type { ErrorCode } from '@catalogcraft/shared';
 import { AppError } from '../utils/app-error.js';
 import { sendError } from '../utils/http-response.js';
+
+const EXPECTED_UNAVAILABLE = new Set<ErrorCode>(['SERVICE_UNAVAILABLE', 'AI_NOT_CONFIGURED']);
 
 /** Unmatched routes get a JSON 404 instead of Express's default HTML page. */
 export const notFoundHandler: RequestHandler = (req, res) => {
@@ -32,7 +35,10 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, req, res, next
   }
 
   if (error instanceof AppError) {
-    if (error.statusCode >= 500) req.log.error({ err: error }, error.message);
+    // "Database down" and "AI not configured" are known operating conditions:
+    // one warning line each, not an error with a stack trace per request.
+    if (EXPECTED_UNAVAILABLE.has(error.code)) req.log.warn({ code: error.code }, error.message);
+    else if (error.statusCode >= 500) req.log.error({ err: error }, error.message);
     sendError(res, error.statusCode, error.code, error.message, error.details);
     return;
   }

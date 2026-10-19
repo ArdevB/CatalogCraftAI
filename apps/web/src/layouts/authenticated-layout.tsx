@@ -1,14 +1,16 @@
 import { LogOut, Loader2 } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
+import { hasPermission, type Permission } from '@catalogcraft/shared';
 import { Button } from '@/components/ui/button';
 import { useLogout, useRequiredSession } from '@/features/auth/use-session';
 import { cn } from '@/lib/utils';
 import { BrandMark } from './app-layout';
 
-const NAV_ITEMS = [
+const NAV_ITEMS: Array<{ to: string; label: string; permission?: Permission }> = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/clients', label: 'Clients' },
   { to: '/jobs', label: 'Jobs' },
+  { to: '/usage', label: 'Usage', permission: 'usage:read' },
   { to: '/settings/organization', label: 'Organization' },
 ];
 
@@ -31,7 +33,7 @@ export function AuthenticatedLayout() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-1 px-4 py-2 sm:h-14 sm:flex-nowrap sm:py-0 sm:px-6">
           <BrandMark to="/dashboard" />
           <nav aria-label="Main" className="order-last -mx-1 flex w-full items-center gap-1 overflow-x-auto sm:order-none sm:mx-0 sm:w-auto">
-            {NAV_ITEMS.map((item) => (
+            {NAV_ITEMS.filter((item) => !item.permission || hasPermission(session.role, item.permission)).map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}

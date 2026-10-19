@@ -5,6 +5,8 @@ import { connectWithRetry, disconnectDatabase } from './config/database.js';
 import { ConfigError, loadConfig, type AppConfig } from './config/env.js';
 import { loadRootEnvFile } from './config/load-env-file.js';
 import { createLogger } from './config/logger.js';
+import { EnrichmentWorker } from './modules/enrichment/enrichment.worker.js';
+import { AnthropicProvider } from './services/ai/anthropic-provider.js';
 import { LocalFileStorage } from './services/storage/storage.js';
 
 loadRootEnvFile();
@@ -38,7 +40,17 @@ const sessionStore = MongoStore.create({
 });
 
 const storage = new LocalFileStorage(config.storageDir);
-const app = createApp({ config, logger, sessionStore, storage });
+// AI is optional: without a key the app runs and AI features say they are not configured.
+const ai = config.ai.apiKey ? new AnthropicProvider({ ...config.ai, apiKey: config.ai.apiKey }) : null;
+if (!ai) logger.warn('AI enrichment is disabled: set AI_API_KEY in .env to enable it.');
+
+const app = createApp({ config, logger, sessionStore, storage, ai });
+
+// The enrichment worker starts once the database is connected.
+const worker = ai ? new EnrichmentWorker({ provider: ai, logger, concurrency: config.ai.concurrency }) : null;
+void connected.then(() => {
+  if (worker && !shutdownController.signal.aborted) worker.start();
+});
 
 const server = app.listen(config.port, () => {
   logger.info(`API listening on http://localhost:${config.port}/api/v1 (${config.nodeEnv})`);
@@ -53,6 +65,8 @@ server.on('error', (error) => {
 async function shutdown(signal: string): Promise<void> {
   logger.info(`${signal} received, shutting down`);
   shutdownController.abort();
+  // Let products already being enriched finish and save; others resume after restart.
+  await worker?.stop();
   const forceExit = setTimeout(() => {
     logger.error('Graceful shutdown timed out; forcing exit');
     process.exit(1);

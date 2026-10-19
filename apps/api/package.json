@@ -15,6 +15,7 @@
     "set-plan": "tsx src/scripts/set-plan.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
     "@catalogcraft/shared": "0.1.0",
     "@node-rs/argon2": "^2.2.2",
     "connect-mongo": "^6.0.0",

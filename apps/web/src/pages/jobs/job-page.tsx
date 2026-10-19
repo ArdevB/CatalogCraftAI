@@ -5,32 +5,48 @@ import type { Job } from '@catalogcraft/shared';
 import { ErrorState, errorMessage, LoadingState } from '@/components/page-states';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePermission } from '@/features/auth/use-session';
+import { EnrichmentPanel } from '@/features/jobs/enrichment-panel';
+import { EnrichmentProgress } from '@/features/jobs/enrichment-progress';
 import { formatBytes, JobStatusBadge } from '@/features/jobs/job-status';
 import { MappingStep } from '@/features/jobs/mapping-step';
 import { UploadStep } from '@/features/jobs/upload-step';
+import { SuggestionsTable } from '@/features/jobs/suggestions-table';
 import { useDeleteJob, useJob } from '@/features/jobs/use-jobs';
 import { ValidationReport } from '@/features/jobs/validation-report';
 import { ApiError } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 
-const STEPS = ['Upload file', 'Map columns', 'Validate', 'Enrich with AI'] as const;
+const STEPS = ['Upload file', 'Map columns', 'Validate', 'Enrich with AI', 'Review & export'] as const;
 
-function currentStep(job: Job): number {
-  if (job.status === 'draft') return 0;
-  if (job.status === 'uploaded') return 1;
-  if (job.status === 'validating' || job.status === 'failed' || job.status === 'ready') return 2;
-  return 3;
+/** The step in progress, and how many steps are complete. */
+function progress(job: Job): { current: number; completed: number } {
+  switch (job.status) {
+    case 'draft':
+      return { current: 0, completed: 0 };
+    case 'uploaded':
+      return { current: 1, completed: 1 };
+    case 'validating':
+      return { current: 2, completed: 2 };
+    case 'ready':
+      return { current: 3, completed: 3 };
+    case 'failed':
+      return job.enrichment ? { current: 3, completed: 3 } : { current: 2, completed: 2 };
+    case 'queued':
+    case 'processing':
+      return { current: 3, completed: 3 };
+    default:
+      return { current: 4, completed: 4 };
+  }
 }
 
 /** Progress indicator only — not navigation, so the steps are not links or buttons. */
 function Stepper({ job }: { job: Job }) {
-  const current = currentStep(job);
+  const { current, completed } = progress(job);
   return (
     <ol className="flex flex-wrap gap-x-6 gap-y-2 text-sm" aria-label="Import progress">
       {STEPS.map((label, index) => {
-        const done = index < current || (index === 2 && job.status === 'ready');
+        const done = index < completed;
         return (
           <li key={label} className="flex items-center gap-2" aria-current={index === current ? 'step' : undefined}>
             <span
@@ -45,7 +61,7 @@ function Stepper({ job }: { job: Job }) {
             </span>
             <span className={cn(index > current && 'text-muted-foreground')}>
               {label}
-              {index === 3 ? <span className="text-muted-foreground"> (coming next)</span> : null}
+              {index === 4 ? <span className="text-muted-foreground"> (coming next)</span> : null}
             </span>
           </li>
         );
@@ -91,7 +107,7 @@ function DeleteJob({ job }: { job: Job }) {
   );
 }
 
-type View = 'auto' | 'replace-file' | 'edit-mapping';
+type View = 'auto' | 'replace-file' | 'edit-mapping' | 'enrich';
 
 function JobBody({ job, view, setView }: { job: Job; view: View; setView: (view: View) => void }) {
   const canEdit = usePermission('jobs:edit');
@@ -102,6 +118,7 @@ function JobBody({ job, view, setView }: { job: Job; view: View; setView: (view:
   }
   if (view === 'replace-file') return <UploadStep jobId={job.id} replacing onCancel={back} />;
   if (view === 'edit-mapping') return <MappingStep job={job} onCancel={back} />;
+  if (view === 'enrich') return <EnrichmentPanel job={job} onCancel={back} />;
 
   switch (job.status) {
     case 'draft':
@@ -110,6 +127,24 @@ function JobBody({ job, view, setView }: { job: Job; view: View; setView: (view:
       return <MappingStep job={job} />;
     case 'validating':
       return <LoadingState label="Validating rows… this usually takes a few seconds." />;
+    case 'queued':
+    case 'processing':
+      return <EnrichmentProgress job={job} />;
+    case 'review':
+      return (
+        <div className="flex flex-col gap-6">
+          {job.lastError ? <Alert variant="destructive">{job.lastError}</Alert> : null}
+          {canEdit ? (
+            <div>
+              <Button variant="outline" size="sm" onClick={() => setView('enrich')}>
+                Generate more suggestions
+              </Button>
+            </div>
+          ) : null}
+          <SuggestionsTable job={job} />
+          <ValidationReport job={job} />
+        </div>
+      );
     default:
       return (
         <div className="flex flex-col gap-6">
@@ -124,18 +159,10 @@ function JobBody({ job, view, setView }: { job: Job; view: View; setView: (view:
               </Button>
             </div>
           ) : null}
-          {job.counts.totalRows > 0 ? <ValidationReport job={job} /> : null}
-          {job.status === 'ready' ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Next: AI enrichment</CardTitle>
-                <CardDescription>
-                  Generating title and description suggestions for these rows arrives in the next phase. Your imported data is
-                  saved and won’t change.
-                </CardDescription>
-              </CardHeader>
-            </Card>
+          {canEdit && job.counts.totalRows > 0 && (job.status === 'ready' || (job.status === 'failed' && job.enrichment)) ? (
+            <EnrichmentPanel job={job} />
           ) : null}
+          {job.counts.totalRows > 0 ? <ValidationReport job={job} /> : null}
         </div>
       );
   }

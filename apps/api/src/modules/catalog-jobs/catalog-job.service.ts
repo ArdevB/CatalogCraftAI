@@ -10,7 +10,9 @@ import {
   type JobList,
   type JobListItem,
   type JobListQuery,
+  type EnrichableField,
   type JobStatus,
+  type LanguageCode,
   type Preview,
   type PreviewRequest,
 } from '@catalogcraft/shared';
@@ -60,6 +62,23 @@ function toListItem(job: JobDoc, names: { client: Map<string, string>; user: Map
       : null,
     counts: { ...EMPTY_COUNTS, ...(job.counts ?? {}) },
     lastError: job.lastError ?? null,
+    enrichment: job.enrichment
+      ? {
+          // Both values are enum-validated by the Mongoose schema.
+          fields: [...job.enrichment.fields] as EnrichableField[],
+          language: job.enrichment.language as LanguageCode,
+          includeWarningRows: job.enrichment.includeWarningRows,
+          model: job.enrichment.model,
+          promptVersion: job.enrichment.promptVersion,
+          totalRows: job.enrichment.totalRows,
+          processedRows: job.enrichment.processedRows,
+          succeededRows: job.enrichment.succeededRows,
+          failedRows: job.enrichment.failedRows,
+          cancelRequested: job.enrichment.cancelRequested,
+          startedAt: job.enrichment.startedAt?.toISOString() ?? null,
+          finishedAt: job.enrichment.finishedAt?.toISOString() ?? null,
+        }
+      : null,
     createdAt: job.createdAt.toISOString(),
     updatedAt: job.updatedAt.toISOString(),
   };

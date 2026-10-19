@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { objectIdSchema, paginationMetaSchema, paginationQuerySchema } from './common.js';
+import { jobEnrichmentSchema, ROW_ENRICHMENT_STATUSES, rowEnrichmentSchema, suggestionSchema } from './enrichment.js';
 
 /* -------------------------------------------------------------------------- */
 /* Standard product fields                                                    */
@@ -84,12 +85,16 @@ export const JOB_TRANSITIONS: Readonly<Record<JobStatus, readonly JobStatus[]>> 
   uploaded: ['uploaded', 'validating'],
   validating: ['ready', 'failed'],
   ready: ['uploaded', 'validating', 'queued'],
-  queued: ['processing', 'ready'],
-  processing: ['review', 'failed'],
-  review: ['processing', 'exporting', 'completed'],
+  // ready/review: cancelled before the worker started (review if earlier suggestions exist).
+  queued: ['processing', 'ready', 'review'],
+  // ready: enrichment cancelled before anything succeeded.
+  processing: ['review', 'failed', 'ready'],
+  // queued: enrich more fields (or remaining rows) after reviewing.
+  review: ['queued', 'exporting', 'completed'],
   exporting: ['review', 'completed', 'failed'],
   completed: ['exporting'],
-  failed: ['uploaded', 'validating'],
+  // queued: retry an enrichment that stopped (e.g. the AI service was unavailable).
+  failed: ['uploaded', 'validating', 'queued'],
 };
 
 export function canTransition(from: JobStatus, to: JobStatus): boolean {
@@ -231,6 +236,7 @@ export const jobSchema = z.object({
   issueSummary: z.array(issueSummarySchema),
   /** Why the job failed, in words the user can act on. */
   lastError: z.string().nullable(),
+  enrichment: jobEnrichmentSchema.nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
@@ -261,6 +267,9 @@ export const catalogRowSchema = z.object({
   status: rowStatusSchema,
   original: productValuesSchema,
   issues: z.array(validationIssueSchema),
+  /** AI suggestions, stored separately from the immutable original values. */
+  suggestions: z.array(suggestionSchema),
+  enrichment: rowEnrichmentSchema.nullable(),
 });
 export type CatalogRow = z.infer<typeof catalogRowSchema>;
 
@@ -268,6 +277,7 @@ export const rowListQuerySchema = paginationQuerySchema.extend({
   status: rowStatusSchema.optional(),
   field: z.string().max(40).optional(),
   search: z.string().trim().max(100).optional(),
+  enrichment: z.enum(ROW_ENRICHMENT_STATUSES).optional(),
 });
 export type RowListQuery = z.infer<typeof rowListQuerySchema>;
 

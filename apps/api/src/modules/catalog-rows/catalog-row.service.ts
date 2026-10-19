@@ -15,6 +15,23 @@ export function toRowDto(row: CatalogRow & { _id: Types.ObjectId }): CatalogRowD
     status: row.status,
     original: productValuesSchema.parse(row.original ?? {}),
     issues: row.validationIssues.map((issue) => ({ ...issue })),
+    suggestions: row.suggestions.map((suggestion) => ({
+      field: suggestion.field,
+      value: suggestion.value,
+      status: suggestion.status,
+      warnings: [...suggestion.warnings],
+      model: suggestion.model,
+      promptVersion: suggestion.promptVersion,
+      generatedAt: suggestion.generatedAt.toISOString(),
+    })),
+    enrichment: row.enrichment
+      ? {
+          status: row.enrichment.status,
+          error: row.enrichment.error ?? null,
+          missingFacts: [...row.enrichment.missingFacts],
+          notes: [...row.enrichment.notes],
+        }
+      : null,
   };
 }
 
@@ -29,6 +46,7 @@ export async function listRows(auth: AuthContext, jobId: string, query: RowListQ
     jobId,
     ...(query.status ? { status: query.status } : {}),
     ...(query.field ? { 'validationIssues.field': query.field } : {}),
+    ...(query.enrichment ? { 'enrichment.status': query.enrichment } : {}),
     ...(search ? { $or: [{ sourceIdentifier: search }, { 'original.title': search }] } : {}),
   };
 

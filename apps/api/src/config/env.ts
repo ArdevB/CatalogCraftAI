@@ -53,6 +53,16 @@ const envSchema = z.object({
   STORAGE_LOCAL_DIR: z.string().trim().min(1).default('./storage'),
   UPLOAD_MAX_MB: z.coerce.number().min(1).max(50).default(10),
   IMPORT_MAX_ROWS: z.coerce.number().int().min(1).max(50_000).default(2_000),
+
+  /** Optional: without a key the app runs, and AI features explain they are not configured. */
+  AI_API_KEY: z.string().trim().optional(),
+  ANTHROPIC_API_KEY: z.string().trim().optional(),
+  AI_MODEL: z.string().trim().min(1).default('claude-opus-5-5'),
+  AI_EFFORT: z.enum(['low', 'medium', 'high']).default('low'),
+  AI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(256).max(16_000).default(4_000),
+  AI_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(600_000).default(90_000),
+  AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
+  AI_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(3),
 });
 
 /** Repository root (this file lives in apps/api/{src,dist}/config). */
@@ -71,6 +81,17 @@ export type AppConfig = Readonly<{
   /** Absolute directory for private files (uploads, exports). Never served directly. */
   storageDir: string;
   imports: Readonly<{ maxUploadBytes: number; maxRows: number }>;
+  ai: Readonly<{
+    /** `null` when no key is configured: AI features are then disabled. */
+    apiKey: string | null;
+    model: string;
+    effort: 'low' | 'medium' | 'high';
+    maxOutputTokens: number;
+    timeoutMs: number;
+    maxRetries: number;
+    /** Products processed at the same time by the background worker. */
+    concurrency: number;
+  }>;
 }>;
 
 export class ConfigError extends Error {
@@ -108,5 +129,14 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     session: Object.freeze({ secret: env.SESSION_SECRET, ttlMs: env.SESSION_TTL_HOURS * 60 * 60 * 1000 }),
     storageDir: path.resolve(REPO_ROOT, env.STORAGE_LOCAL_DIR),
     imports: Object.freeze({ maxUploadBytes: Math.round(env.UPLOAD_MAX_MB * 1024 * 1024), maxRows: env.IMPORT_MAX_ROWS }),
+    ai: Object.freeze({
+      apiKey: env.AI_API_KEY || env.ANTHROPIC_API_KEY || null,
+      model: env.AI_MODEL,
+      effort: env.AI_EFFORT,
+      maxOutputTokens: env.AI_MAX_OUTPUT_TOKENS,
+      timeoutMs: env.AI_TIMEOUT_MS,
+      maxRetries: env.AI_MAX_RETRIES,
+      concurrency: env.AI_CONCURRENCY,
+    }),
   });
 }

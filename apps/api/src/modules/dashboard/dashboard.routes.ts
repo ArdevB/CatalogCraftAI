@@ -9,6 +9,7 @@ import { CatalogJobModel } from '../catalog-jobs/catalog-job.model.js';
 import { ClientModel } from '../clients/client.model.js';
 import { getWorkspaceAllowance } from '../clients/client.service.js';
 import { OrganizationModel } from '../organizations/organization.model.js';
+import { getUsage } from '../usage/usage.service.js';
 
 /**
  * Dashboard figures, computed from real data on each request. Product usage
@@ -21,7 +22,7 @@ export function dashboardRouter(): Router {
   router.get('/summary', async (req, res) => {
     const auth = getAuth(req);
     const scope = tenantScope(auth);
-    const [organization, clients, recentClients, active, needsReview, failed, recentJobs] = await Promise.all([
+    const [organization, clients, recentClients, active, needsReview, failed, recentJobs, usage] = await Promise.all([
       OrganizationModel.findById(auth.organizationId).select('plan').lean(),
       getWorkspaceAllowance(auth),
       ClientModel.find(scope).sort({ updatedAt: -1 }).limit(5).select('name updatedAt').lean(),
@@ -29,6 +30,7 @@ export function dashboardRouter(): Router {
       CatalogJobModel.countDocuments({ ...scope, status: 'review' }),
       CatalogJobModel.countDocuments({ ...scope, status: 'failed' }),
       CatalogJobModel.find(scope).sort({ updatedAt: -1 }).limit(5).select('name status clientId updatedAt').lean(),
+      getUsage(auth.organizationId, null),
     ]);
     if (!organization) throw new AppError('NOT_FOUND', 'Organization not found.');
 
@@ -45,6 +47,7 @@ export function dashboardRouter(): Router {
         name: client.name,
         updatedAt: client.updatedAt.toISOString(),
       })),
+      products: { used: usage.products.used, limit: usage.products.limit },
       jobs: { active, activeLimit: planLimits(organization.plan).maxActiveJobs, needsReview, failed },
       recentJobs: recentJobs.map((job) => ({
         id: job._id.toString(),

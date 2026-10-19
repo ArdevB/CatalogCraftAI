@@ -9,6 +9,7 @@ import { getDatabaseStatus as mongooseDatabaseStatus } from './config/database.j
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { apiRateLimit, corsPolicy, securityHeaders } from './middleware/security.js';
 import { apiV1Router } from './routes.js';
+import type { AiProvider } from './services/ai/provider.js';
 import type { FileStorage } from './services/storage/storage.js';
 
 export type AppDependencies = {
@@ -18,6 +19,8 @@ export type AppDependencies = {
   sessionStore: Store;
   /** Private file storage for uploads and exports. */
   storage: FileStorage;
+  /** The AI provider, or `null` when AI is not configured. */
+  ai: AiProvider | null;
   /** Injectable so tests can simulate a connected or disconnected database. */
   getDatabaseStatus?: () => DatabaseStatus;
 };
@@ -32,6 +35,7 @@ export function createApp({
   logger,
   sessionStore,
   storage,
+  ai,
   getDatabaseStatus = mongooseDatabaseStatus,
 }: AppDependencies): Express {
   const app = express();
@@ -57,7 +61,7 @@ export function createApp({
   app.use(express.json({ limit: '1mb' }));
 
   app.use('/api', apiRateLimit(config));
-  app.use('/api/v1', apiV1Router({ config, getDatabaseStatus, sessionStore, storage }));
+  app.use('/api/v1', apiV1Router({ config, getDatabaseStatus, sessionStore, storage, ai }));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

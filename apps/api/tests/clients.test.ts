@@ -251,6 +251,7 @@ describe('client tenant isolation', () => {
       plan: 'trial',
       clients: { used: 0, limit: 1 },
       recentClients: [],
+      products: { used: 0, limit: 25 },
       jobs: { active: 0, activeLimit: 1, needsReview: 0, failed: 0 },
       recentJobs: [],
     });

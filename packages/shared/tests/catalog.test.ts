@@ -18,6 +18,7 @@ describe('job state transitions', () => {
     ['ready', 'uploaded'],
     ['failed', 'validating'],
     ['review', 'exporting'],
+    ['review', 'queued'],
   ] as const)('allows %s → %s', (from, to) => {
     expect(canTransition(from, to)).toBe(true);
   });

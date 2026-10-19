@@ -2,7 +2,7 @@
 
 Multi-tenant SaaS for ecommerce agencies: import messy supplier catalogues (CSV/XLSX), validate them, generate AI suggestions for selected fields, review every change, and export a clean CSV — with product facts and protected fields (SKU, price, stock, barcodes…) never altered by AI.
 
-> **Status: Phase 2 (File import) complete.** Accounts, organizations and roles, client workspaces, plan limits, a live dashboard, and the full import workflow — CSV/XLSX upload, worksheet & header-row selection, column mapping, preview and deterministic validation with a row-level report — are working. AI enrichment, review and export are **not implemented yet** — see [Roadmap](#roadmap).
+> **Status: Phase 3 (AI enrichment) complete.** Accounts, organizations and roles, client workspaces, plan limits, a live dashboard, the full import workflow (upload, mapping, validation), and AI enrichment — background generation of title/description/SEO/tag suggestions with guardrails, usage tracking and plan limits — are working. Human review (approve/edit/reject) and CSV export are **not implemented yet** — see [Roadmap](#roadmap).
 
 ---
 
@@ -98,6 +98,12 @@ All settings come from environment variables, validated at startup by [`apps/api
 | `STORAGE_LOCAL_DIR` | no | `./storage` | Private folder for uploaded files (relative to the repo root, or absolute) |
 | `UPLOAD_MAX_MB` | no | `10` | Maximum upload size |
 | `IMPORT_MAX_ROWS` | no | `2000` | Maximum product rows per job |
+| `AI_API_KEY` | no | – | Anthropic API key. Without it, AI features report "not configured" (never fake results). `ANTHROPIC_API_KEY` is also accepted. |
+| `AI_MODEL` | no | `claude-opus-5-5` | Model for suggestions — see [AI costs](#ai-costs) |
+| `AI_EFFORT` | no | `low` | `low` / `medium` / `high` reasoning effort |
+| `AI_MAX_OUTPUT_TOKENS` | no | `4000` | Cap on each product response |
+| `AI_TIMEOUT_MS` / `AI_MAX_RETRIES` | no | `90000` / `2` | Per-request timeout; automatic retries for rate limits and overloads |
+| `AI_CONCURRENCY` | no | `3` | Products processed at the same time |
 | `NODE_ENV` | no | `development` | `development`, `test` or `production` |
 | `PORT` | no | `4000` | API port (the Vite proxy uses it too) |
 | `LOG_LEVEL` | no | `info` | pino log level |
@@ -147,7 +153,11 @@ State-changing requests (`POST`/`PUT`/`PATCH`/`DELETE`) must include the header 
 | POST | `/api/v1/jobs/:jobId/preview` | `jobs:read` | `{ sheetName?, headerRow? }` → headers, first rows, row count, suggested mapping, notices. Read-only. |
 | PUT | `/api/v1/jobs/:jobId/mapping` | `jobs:edit` | `{ sheetName, headerRow, mapping: { sku: 0, title: 2, … } }` (field → column index). Needs a SKU or Product ID. |
 | POST | `/api/v1/jobs/:jobId/validate` | `jobs:edit` | Imports and validates every row → status `ready` (or `failed` with `lastError`, e.g. too many rows). |
-| GET | `/api/v1/jobs/:jobId/rows?status=&field=&search=&page=` | `jobs:read` | Paginated rows with original values and validation issues. |
+| GET | `/api/v1/jobs/:jobId/rows?status=&field=&search=&enrichment=&page=` | `jobs:read` | Paginated rows with original values, validation issues, AI suggestions and enrichment status. |
+| POST | `/api/v1/jobs/:jobId/enrich` | `jobs:edit` | `{ fields: ["title","description","seoTitle","seoDescription","tags"], language?, includeWarningRows? }` → `202`, job `queued`. `503 AI_NOT_CONFIGURED` without a key; `403 PLAN_LIMIT_REACHED` over the monthly allowance. |
+| POST | `/api/v1/jobs/:jobId/enrich/cancel` | `jobs:edit` | Stops a queued or running enrichment; suggestions already made are kept. |
+| GET | `/api/v1/usage` | `usage:read` | This month: products enriched / reserved / limit, AI requests, failures, tokens, estimated cost, AI status. |
+| GET | `/api/v1/ai/status` | signed in | `{ configured, model }`. |
 | GET | `/api/v1/dashboard/summary` | signed in | Plan, client workspace count vs. limit, 5 most recently updated clients. |
 
 ### Plans
@@ -173,6 +183,33 @@ Permissions are defined once in [`packages/shared/src/schemas/roles.ts`](package
 - **Rows:** each product row is its own MongoDB document. `sourceValues` (every cell, exactly as in the file) and `original` (mapped fields) are **immutable** — later phases store AI suggestions and approved values separately. Blank rows are counted and reported, never silently dropped; row numbers match the spreadsheet.
 - **Validation** is plain, deterministic code ([`services/validation`](apps/api/src/services/validation)) — never the LLM. Errors: missing identifier, duplicate SKU / variant ID, unreadable or negative price. Warnings: empty/over-long title (client's limit), ambiguous decimal comma, price with currency symbol, invalid currency code, stock or barcode (GTIN check digit), non-http image URL, broken parent/variant links, exact duplicate rows, suspiciously long values. Info: empty description.
 - **Retention:** an uploaded file is kept while its job exists and deleted with the job (or when replaced). Automatic expiry is planned for pilot readiness.
+
+### AI enrichment
+
+`ready` → **enrich** → `queued` → `processing` → `review` (or `ready` if cancelled first, `failed` if nothing succeeded). Code: [`services/ai`](apps/api/src/services/ai) and [`modules/enrichment`](apps/api/src/modules/enrichment).
+
+- **Provider abstraction:** business logic talks to an `AiProvider` interface; [`anthropic-provider.ts`](apps/api/src/services/ai/anthropic-provider.ts) is the only implementation. Automated tests use a scripted mock that exists only in `tests/`.
+- **Structured output:** the model must answer in a JSON schema containing exactly the requested fields, validated by the SDK with Zod. Refused, cut-off or malformed answers are recorded as failed rows — never saved as suggestions.
+- **Protected by construction:** only title, description, SEO title/description and tags can be suggested; the schema has no slot for SKU, price, stock, barcode or any other protected field. Suggestions live in `row.suggestions` as `pending`; `row.original` is immutable.
+- **Data minimisation:** only copy-relevant facts (title, description, brand, type, category, material, colour, size, dimensions, weight, tags, SEO fields) are sent. Identifiers, prices, stock, barcodes and URLs never leave the server. Rows with validation errors are never sent.
+- **Prompt-injection mitigation:** product text is sent as escaped JSON inside a clearly marked data block (it cannot close the block), the system prompt says data is never instructions, and the output schema plus guardrails limit what any answer can do.
+- **Guardrails** ([`guardrails.ts`](apps/api/src/services/ai/guardrails.ts)): suggestions using a client's *prohibited claims* are blocked; numbers not present in the source data are flagged (the classic sign of an invented spec); over-long titles/SEO text, HTML, and unchanged values are flagged.
+- **Versioned prompt:** `product-enrichment@1`, stored with every suggestion along with the model.
+- **Background worker without Redis:** the job document is the queue. The worker claims a job atomically with a time-limited lease, processes a few products at a time, saves after each, and a crashed run resumes when its lease expires. Cancellation is checked between batches. A bad key/model stops the run at once; repeated service failures pause it.
+- **Usage:** an append-only `UsageEvent` per AI request (tokens, model). A product counts towards the monthly allowance only when enrichment **succeeds**; failures are free. Before starting, the request is checked against used + reserved (running jobs) + requested.
+- **Refusal fallback:** on models that support it, Anthropic's server-side fallback re-runs a declined request on a suitable model; otherwise the row is marked failed.
+
+### AI costs
+
+Rough cost per product (≈ 600 input + 400 output tokens incl. reasoning; your data will vary — the Usage page shows real token counts):
+
+| `AI_MODEL` | Price (in / out per 1M tokens) | ≈ per product | ≈ 2,000 products |
+| --- | --- | --- | --- |
+| `claude-opus-5-5` (default) | $4 / $20 | $0.010 | $20 |
+| `claude-sonnet-5-5` | $2 / $10 | $0.005 | $10 |
+| `claude-haiku-5-5` | $0.10 / $0.50 | $0.0003 | $0.50 |
+
+Try a small job on each and compare the copy before choosing. Set a monthly spend limit in the Anthropic console as a safety net.
 
 ## Key design decisions (and why)
 
@@ -200,6 +237,11 @@ Permissions are defined once in [`packages/shared/src/schemas/roles.ts`](package
 | `SESSION_SECRET is required` / `still contains the placeholder` | Generate one with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` and paste it into `.env`. |
 | Signed out unexpectedly after changing `SESSION_SECRET` | Expected: existing session cookies are signed with the old secret. Sign in again. |
 | `Request blocked: missing anti-forgery header` when calling the API from curl/Postman | Add the header `X-CatalogCraft-Request: 1` to POST/PATCH/PUT/DELETE requests. |
+| "AI enrichment isn't set up on this server" | Put your key in `AI_API_KEY` in the root `.env` and restart the API (the log says "AI enrichment is disabled" when it's missing). |
+| Job failed: "Your Anthropic account has no API credit left" | The key works, but API usage is prepaid and separate from a Claude.ai subscription. Add credits at console.anthropic.com → Plans & Billing (a few dollars covers thousands of products on Haiku, hundreds on Opus), then start enrichment again. |
+| Job failed: "The AI service rejected the API key" | The key is wrong, revoked, or for another account. Fix `AI_API_KEY` and start enrichment again. |
+| Job failed: "The configured AI model was not found" | Check the spelling of `AI_MODEL` (e.g. `claude-opus-5-5`). |
+| Enrichment "paused" after several failures | The AI service was rate limiting or overloaded. Wait a few minutes and start again — finished products keep their suggestions. |
 | Upload rejected: "not a valid Excel workbook" / "Older .xls files" | Open the file in Excel and **Save As** `.xlsx` or CSV (UTF-8). |
 | Accented characters look wrong after import | Save the CSV as **CSV UTF-8** in Excel. Files that aren't UTF-8 are read as Windows-1252, and the mapping step shows a notice. |
 | Job failed: "more than 2,000 product rows" | Split the file, or raise `IMPORT_MAX_ROWS` for local testing. |
@@ -231,6 +273,6 @@ Full deployment docs come with pilot readiness (Phase 6). The shape will be:
 - [x] **Milestone 3 — Client workspaces & dashboard:** client CRUD with brand profiles, plan limits, real dashboard statistics, seed sample client, manual plan script
 - [ ] Later: team invitations by email, account & organization deletion policy, audit log
 - [x] **Phase 2 — File import:** catalogue jobs with a state machine, CSV/XLSX upload with private storage, worksheet & header-row selection, column mapping with suggestions, preview, deterministic validation, row-level report, job history
-- [ ] **Phase 3 — AI enrichment:** provider abstraction, versioned prompts, schema-validated suggestions, usage limits
+- [x] **Phase 3 — AI enrichment:** provider abstraction (Anthropic), versioned prompt, structured & validated output, guardrails, background worker with leases and cancellation, usage ledger, monthly limits, usage page
 - [ ] **Phase 4 — Review & export:** review table, approve/edit/reject, audit log, safe CSV export
 - [ ] **Phase 5–6 — Agency workflow & pilot readiness**

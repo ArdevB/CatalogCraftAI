@@ -20,6 +20,7 @@ function makeJob(overrides: Partial<Job> = {}): Job {
     counts: { totalRows: 0, validRows: 0, warningRows: 0, failedRows: 0, skippedEmptyRows: 0 },
     issueSummary: [],
     lastError: null,
+    enrichment: null,
     createdAt: '2026-10-18T10:00:00.000Z',
     updatedAt: '2026-10-18T10:00:00.000Z',
     ...overrides,
@@ -57,7 +58,7 @@ const validatedJob = makeJob({
 
 const rows = {
   items: [
-    { id: 'r1', rowNumber: 2, sourceIdentifier: 'MUG-1', status: 'valid', original: { sku: 'MUG-1', title: 'Stoneware mug', price: '12.50' }, issues: [] },
+    { id: 'r1', rowNumber: 2, sourceIdentifier: 'MUG-1', status: 'valid', original: { sku: 'MUG-1', title: 'Stoneware mug', price: '12.50' }, issues: [], suggestions: [], enrichment: null },
     {
       id: 'r2',
       rowNumber: 3,
@@ -65,6 +66,8 @@ const rows = {
       status: 'error',
       original: { sku: 'MUG-2', title: 'Enamel mug', price: 'abc' },
       issues: [{ field: 'price', type: 'invalid', severity: 'error', message: 'Price “abc” is not a valid number.' }],
+      suggestions: [],
+      enrichment: null,
     },
   ],
   pagination: { page: 1, pageSize: 25, totalItems: 2, totalPages: 1 },

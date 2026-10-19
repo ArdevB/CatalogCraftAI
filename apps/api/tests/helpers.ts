@@ -19,12 +19,14 @@ import { createApp } from '../src/app.js';
 import { ensureIndexes, getDatabaseStatus } from '../src/config/database.js';
 import { loadConfig, type AppConfig } from '../src/config/env.js';
 import { createLogger } from '../src/config/logger.js';
+import type { AiProvider } from '../src/services/ai/provider.js';
 import { LocalFileStorage } from '../src/services/storage/storage.js';
 // Importing the models registers them with Mongoose.
 import '../src/modules/auth/user.model.js';
 import '../src/modules/catalog-jobs/catalog-job.model.js';
 import '../src/modules/catalog-rows/catalog-row.model.js';
 import '../src/modules/clients/client.model.js';
+import '../src/modules/usage/usage-event.model.js';
 import { MembershipModel } from '../src/modules/memberships/membership.model.js';
 import { OrganizationModel } from '../src/modules/organizations/organization.model.js';
 
@@ -46,13 +48,14 @@ export function testConfig(overrides: Record<string, string> = {}): AppConfig {
 }
 
 /** App without a database, for middleware tests. Sessions live in memory. */
-export function testApp(options: { databaseStatus?: DatabaseStatus; env?: Record<string, string> } = {}) {
+export function testApp(options: { databaseStatus?: DatabaseStatus; env?: Record<string, string>; ai?: AiProvider | null } = {}) {
   const config = testConfig(options.env);
   return createApp({
     config,
     logger: createLogger(config),
     sessionStore: new session.MemoryStore(),
     storage: testStorage,
+    ai: options.ai ?? null,
     getDatabaseStatus: () => options.databaseStatus ?? 'connected',
   });
 }
@@ -71,13 +74,14 @@ export async function disconnectTestDatabase(): Promise<void> {
 }
 
 /** The full app wired to the test database, with sessions stored in MongoDB like production. */
-export function dbTestApp(env: Record<string, string> = {}) {
+export function dbTestApp(env: Record<string, string> = {}, options: { ai?: AiProvider | null } = {}) {
   const config = testConfig(env);
   return createApp({
     config,
     logger: createLogger(config),
     sessionStore: MongoStore.create({ client: mongoose.connection.getClient(), ttl: 3600 }),
     storage: testStorage,
+    ai: options.ai ?? null,
     getDatabaseStatus,
   });
 }

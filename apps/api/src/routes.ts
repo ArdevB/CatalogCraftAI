@@ -11,6 +11,8 @@ import { clientsRouter } from './modules/clients/client.routes.js';
 import { dashboardRouter } from './modules/dashboard/dashboard.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 import { organizationsRouter } from './modules/organizations/organization.routes.js';
+import { aiStatusRouter, enrichmentRouter, usageRouter } from './modules/enrichment/enrichment.routes.js';
+import type { AiProvider } from './services/ai/provider.js';
 import type { FileStorage } from './services/storage/storage.js';
 
 export type RouteDependencies = {
@@ -18,6 +20,8 @@ export type RouteDependencies = {
   getDatabaseStatus: () => DatabaseStatus;
   sessionStore: Store;
   storage: FileStorage;
+  /** `null` when no AI key is configured. */
+  ai: AiProvider | null;
 };
 
 /** Everything mounted under `/api/v1`. New modules register their routers here. */
@@ -41,6 +45,9 @@ export function apiV1Router(deps: RouteDependencies): Router {
   router.use('/clients', clientsRouter());
   router.use('/dashboard', dashboardRouter());
   router.use('/jobs', jobsRouter({ config: deps.config, storage: deps.storage }));
+  router.use('/jobs', enrichmentRouter(deps.ai));
+  router.use('/usage', usageRouter(deps.ai));
+  router.use('/ai', aiStatusRouter(deps.ai));
 
   return router;
 }

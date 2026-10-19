@@ -15,6 +15,7 @@ import { NotFoundPage } from '@/pages/not-found-page';
 import { OrganizationSettingsPage } from '@/pages/organization-settings-page';
 import { RegisterPage } from '@/pages/register-page';
 import { RouteErrorPage } from '@/pages/route-error-page';
+import { UsagePage } from '@/pages/usage-page';
 
 export const routes: RouteObject[] = [
   {
@@ -46,6 +47,7 @@ export const routes: RouteObject[] = [
               { path: 'clients/:clientId/edit', element: <ClientEditPage /> },
               { path: 'jobs', element: <JobsListPage /> },
               { path: 'jobs/:jobId', element: <JobPage /> },
+              { path: 'usage', element: <UsagePage /> },
               { path: 'settings/organization', element: <OrganizationSettingsPage /> },
             ],
           },

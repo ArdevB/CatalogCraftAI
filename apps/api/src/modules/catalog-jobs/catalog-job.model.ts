@@ -1,5 +1,5 @@
 import { model, Schema, type InferSchemaType } from 'mongoose';
-import { ISSUE_SEVERITIES, ISSUE_TYPES, JOB_STATUSES } from '@catalogcraft/shared';
+import { ENRICHABLE_FIELD_KEYS, ISSUE_SEVERITIES, ISSUE_TYPES, JOB_STATUSES } from '@catalogcraft/shared';
 
 /** The uploaded source file. `storageKey` is server-generated; the user's filename is display-only. */
 const originalFileSchema = new Schema(
@@ -49,6 +49,29 @@ const countsSchema = new Schema(
   { _id: false },
 );
 
+/** Settings and progress of the AI enrichment run (one at a time per job). */
+const enrichmentSchema = new Schema(
+  {
+    fields: { type: [String], enum: ENRICHABLE_FIELD_KEYS, required: true },
+    language: { type: String, required: true },
+    includeWarningRows: { type: Boolean, required: true },
+    model: { type: String, required: true },
+    promptVersion: { type: String, required: true },
+    totalRows: { type: Number, default: 0 },
+    processedRows: { type: Number, default: 0 },
+    succeededRows: { type: Number, default: 0 },
+    failedRows: { type: Number, default: 0 },
+    /** False until every selected row is marked, so the worker never starts on a half-prepared job. */
+    rowsPrepared: { type: Boolean, default: false },
+    cancelRequested: { type: Boolean, default: false },
+    /** While a worker holds the job; if it crashes, the lease expires and another run resumes. */
+    leaseExpiresAt: { type: Date, default: null },
+    startedAt: { type: Date, default: null },
+    finishedAt: { type: Date, default: null },
+  },
+  { _id: false },
+);
+
 const catalogJobSchema = new Schema(
   {
     organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },
@@ -61,6 +84,7 @@ const catalogJobSchema = new Schema(
     counts: { type: countsSchema, default: () => ({}) },
     issueSummary: { type: [issueSummarySchema], default: [] },
     lastError: { type: String, default: null, maxlength: 1000 },
+    enrichment: { type: enrichmentSchema, default: null },
   },
   { timestamps: true },
 );
@@ -68,6 +92,8 @@ const catalogJobSchema = new Schema(
 catalogJobSchema.index({ organizationId: 1, createdAt: -1 });
 catalogJobSchema.index({ organizationId: 1, clientId: 1, createdAt: -1 });
 catalogJobSchema.index({ organizationId: 1, status: 1 });
+// The worker looks for queued jobs and for processing jobs whose lease expired.
+catalogJobSchema.index({ status: 1, updatedAt: 1 });
 
 export type CatalogJob = InferSchemaType<typeof catalogJobSchema>;
 export const CatalogJobModel = model('CatalogJob', catalogJobSchema);

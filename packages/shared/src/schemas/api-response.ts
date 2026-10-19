@@ -21,6 +21,7 @@ export const ERROR_CODES = [
   'INVALID_FILE',
   'RATE_LIMITED',
   'SERVICE_UNAVAILABLE',
+  'AI_NOT_CONFIGURED',
   'INTERNAL_ERROR',
 ] as const;
 

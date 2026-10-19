@@ -5,10 +5,13 @@ import {
   jobSchema,
   previewSchema,
   rowListSchema,
+  usageSummarySchema,
   type CreateJobInput,
   type Job,
   type JobStatus,
+  type RowEnrichment,
   type RowStatus,
+  type StartEnrichmentInput,
   type SaveMappingInput,
 } from '@catalogcraft/shared';
 import { dashboardSummaryKey } from '@/features/clients/use-clients';
@@ -39,8 +42,11 @@ export function useJob(jobId: string) {
   return useQuery({
     queryKey: jobKeys.detail(jobId),
     queryFn: ({ signal }) => apiRequest(jobPath(jobId), jobSchema, { signal }),
-    // While validation runs (e.g. started in another tab), keep checking.
-    refetchInterval: (query) => (query.state.data?.status === 'validating' ? 2_000 : false),
+    // While work runs in the background (validation, AI enrichment), keep checking.
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === 'validating' || status === 'queued' || status === 'processing' ? 2_000 : false;
+    },
   });
 }
 
@@ -57,13 +63,14 @@ export function usePreview(jobId: string, params: { sheetName?: string; headerRo
 
 export function useJobRows(
   jobId: string,
-  params: { page: number; status?: RowStatus; field?: string; search?: string },
+  params: { page: number; status?: RowStatus; field?: string; search?: string; enrichment?: RowEnrichment['status'] },
   enabled = true,
 ) {
   const query = new URLSearchParams({ page: String(params.page), pageSize: '25' });
   if (params.status) query.set('status', params.status);
   if (params.field) query.set('field', params.field);
   if (params.search) query.set('search', params.search);
+  if (params.enrichment) query.set('enrichment', params.enrichment);
   return useQuery({
     queryKey: jobKeys.rows(jobId, params),
     queryFn: ({ signal }) => apiRequest(`${jobPath(jobId)}/rows?${query.toString()}`, rowListSchema, { signal }),
@@ -136,5 +143,42 @@ export function useDeleteJob(jobId: string) {
         queryClient.invalidateQueries({ queryKey: dashboardSummaryKey }),
       ]);
     },
+  });
+}
+
+export function useStartEnrichment(jobId: string) {
+  const onUpdated = useJobUpdated();
+  return useMutation({
+    mutationFn: (input: StartEnrichmentInput) =>
+      apiRequest(`${jobPath(jobId)}/enrich`, jobSchema, { method: 'POST', body: input }),
+    onSuccess: onUpdated,
+  });
+}
+
+export function useCancelEnrichment(jobId: string) {
+  const onUpdated = useJobUpdated();
+  return useMutation({
+    mutationFn: () => apiRequest(`${jobPath(jobId)}/enrich/cancel`, jobSchema, { method: 'POST' }),
+    onSuccess: onUpdated,
+  });
+}
+
+const aiStatusSchema = z.object({ configured: z.boolean(), model: z.string().nullable() });
+
+/** Whether the server has an AI provider configured (any signed-in role may ask). */
+export function useAiStatus() {
+  return useQuery({
+    queryKey: ['ai', 'status'],
+    queryFn: ({ signal }) => apiRequest('/ai/status', aiStatusSchema, { signal }),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** This month's usage. Owners and admins only — pass `enabled: false` for other roles. */
+export function useUsage(enabled = true) {
+  return useQuery({
+    queryKey: ['usage'],
+    queryFn: ({ signal }) => apiRequest('/usage', usageSummarySchema, { signal }),
+    enabled,
   });
 }
