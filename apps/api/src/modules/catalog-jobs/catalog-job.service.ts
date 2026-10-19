@@ -28,7 +28,9 @@ import { AppError } from '../../utils/app-error.js';
 import { tenantScope } from '../../utils/tenant.js';
 import { UserModel } from '../auth/user.model.js';
 import { CatalogRowModel } from '../catalog-rows/catalog-row.model.js';
+import { reviewSummary } from '../catalog-rows/review-summary.js';
 import { ClientModel } from '../clients/client.model.js';
+import { deleteJobExports } from '../exports/export-cleanup.js';
 import { OrganizationModel } from '../organizations/organization.model.js';
 import { CatalogJobModel, type CatalogJob } from './catalog-job.model.js';
 
@@ -108,6 +110,7 @@ export async function toJobDto(job: JobDoc): Promise<Job> {
         }
       : null,
     issueSummary: job.issueSummary.map((item) => ({ ...item })),
+    review: job.enrichment ? await reviewSummary(job._id, job.organizationId) : null,
   };
 }
 
@@ -433,6 +436,7 @@ export async function deleteJob(deps: JobServiceDeps, auth: AuthContext, jobId: 
     throw new AppError('CONFLICT', `This job is ${STATUS_WORDS[job.status]}. Wait for it to finish before deleting it.`);
   }
   await CatalogRowModel.deleteMany({ jobId: job._id, ...tenantScope(auth) });
+  await deleteJobExports(deps.storage, job._id, job.organizationId);
   await CatalogJobModel.deleteOne({ _id: job._id, ...tenantScope(auth) });
   if (job.originalFile) await deps.storage.delete(job.originalFile.storageKey);
 }

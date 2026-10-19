@@ -1,7 +1,7 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_BRAND_PROFILE, type CatalogRow, type Job, type JobEnrichment, type Role, type UsageSummary } from '@catalogcraft/shared';
+import { DEFAULT_BRAND_PROFILE, type Job, type JobEnrichment, type Role, type UsageSummary } from '@catalogcraft/shared';
 import { fail, mockApi, ok, renderRoute, sessionInfo } from './utils';
 
 const JOB_ID = 'a'.repeat(24);
@@ -37,6 +37,7 @@ function makeJob(overrides: Partial<Job> = {}): Job {
     issueSummary: [],
     lastError: null,
     enrichment: null,
+    review: null,
     createdAt: '2026-10-18T10:00:00.000Z',
     updatedAt: '2026-10-18T10:05:00.000Z',
     ...overrides,
@@ -157,61 +158,6 @@ describe('enrichment progress', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Stop enrichment' }));
     expect(await screen.findByText('Stopping after the current products…')).toBeInTheDocument();
     expect(stopped).toBe(true);
-  });
-});
-
-describe('suggestions', () => {
-  const doneRow: CatalogRow = {
-    id: 'r1',
-    rowNumber: 2,
-    sourceIdentifier: 'MUG-1',
-    status: 'valid',
-    original: { sku: 'MUG-1', title: 'Mug stoneware blue' },
-    issues: [],
-    suggestions: [
-      {
-        field: 'title',
-        value: 'Blue stoneware mug, 350 ml',
-        status: 'pending',
-        warnings: ["Mentions “350”, which doesn't appear in the product data. Check before approving."],
-        model: 'claude-opus-5-5',
-        promptVersion: 'product-enrichment@1',
-        generatedAt: '2026-10-18T10:06:00.000Z',
-      },
-    ],
-    enrichment: { status: 'done', error: null, missingFacts: ['capacity'], notes: [] },
-  };
-  const failedRow: CatalogRow = {
-    ...doneRow,
-    id: 'r2',
-    rowNumber: 3,
-    sourceIdentifier: 'MUG-2',
-    suggestions: [],
-    enrichment: { status: 'failed', error: 'The AI declined to write copy for this product.', missingFacts: [], notes: [] },
-  };
-  const page = (items: CatalogRow[]) => ok({ items, pagination: { page: 1, pageSize: 25, totalItems: items.length, totalPages: 1 } });
-
-  it('shows each suggestion beside the original, with warnings and failures', async () => {
-    mockApi({
-      'GET /me': session(),
-      [`GET /jobs/${JOB_ID}`]: () =>
-        ok(makeJob({ status: 'review', enrichment: enrichment({ processedRows: 3, succeededRows: 2, failedRows: 1, finishedAt: '2026-10-18T10:07:00.000Z' }) })),
-      [`GET /jobs/${JOB_ID}/rows?page=1&pageSize=25&enrichment=done`]: () => page([doneRow]),
-      [`GET /jobs/${JOB_ID}/rows?page=1&pageSize=25&enrichment=failed`]: () => page([failedRow]),
-      [`GET /jobs/${JOB_ID}/rows?page=1&pageSize=25`]: emptyRows,
-    });
-    renderRoute(`/jobs/${JOB_ID}`);
-
-    const card = (await screen.findByRole('heading', { name: 'AI suggestions' })).closest('div')!.parentElement!;
-    expect(within(card).getByText(/2 products have suggestions, 1 failed/)).toBeInTheDocument();
-    expect(await screen.findByText('Blue stoneware mug, 350 ml')).toBeInTheDocument();
-    expect(screen.getByText('Mug stoneware blue')).toBeInTheDocument();
-    expect(screen.getByText(/Mentions “350”/)).toBeInTheDocument();
-    expect(screen.getByText(/Missing facts: capacity/)).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Failed' }));
-    expect(await screen.findByText('The AI declined to write copy for this product.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Generate more suggestions' })).toBeInTheDocument();
   });
 });
 

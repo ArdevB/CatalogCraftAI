@@ -27,6 +27,8 @@ import '../src/modules/catalog-jobs/catalog-job.model.js';
 import '../src/modules/catalog-rows/catalog-row.model.js';
 import '../src/modules/clients/client.model.js';
 import '../src/modules/usage/usage-event.model.js';
+import '../src/modules/audit/audit-log.model.js';
+import '../src/modules/exports/export.model.js';
 import { MembershipModel } from '../src/modules/memberships/membership.model.js';
 import { OrganizationModel } from '../src/modules/organizations/organization.model.js';
 

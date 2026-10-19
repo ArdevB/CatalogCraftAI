@@ -17,6 +17,11 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 const successEnvelopeSchema = apiSuccessResponseSchema(z.unknown());
 
+/** Full URL of an API path, for plain links such as file downloads (cookies are sent automatically). */
+export function apiUrl(path: string): string {
+  return `${API_BASE_URL}${path}`;
+}
+
 /** Error codes that only the browser can produce (the request never got a valid answer). */
 export type ClientErrorCode = 'NETWORK_ERROR' | 'INVALID_RESPONSE';
 

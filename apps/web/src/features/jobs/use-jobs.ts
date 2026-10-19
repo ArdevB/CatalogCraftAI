@@ -5,6 +5,10 @@ import {
   jobSchema,
   previewSchema,
   rowListSchema,
+  auditEntrySchema,
+  bulkReviewResultSchema,
+  catalogRowSchema,
+  exportSchema,
   usageSummarySchema,
   type CreateJobInput,
   type Job,
@@ -12,6 +16,10 @@ import {
   type RowEnrichment,
   type RowStatus,
   type StartEnrichmentInput,
+  type SuggestionStatus,
+  type BulkReviewInput,
+  type ExportRequestInput,
+  type ReviewActionInput,
   type SaveMappingInput,
 } from '@catalogcraft/shared';
 import { dashboardSummaryKey } from '@/features/clients/use-clients';
@@ -63,7 +71,14 @@ export function usePreview(jobId: string, params: { sheetName?: string; headerRo
 
 export function useJobRows(
   jobId: string,
-  params: { page: number; status?: RowStatus; field?: string; search?: string; enrichment?: RowEnrichment['status'] },
+  params: {
+    page: number;
+    status?: RowStatus;
+    field?: string;
+    search?: string;
+    enrichment?: RowEnrichment['status'];
+    suggestion?: SuggestionStatus | 'any';
+  },
   enabled = true,
 ) {
   const query = new URLSearchParams({ page: String(params.page), pageSize: '25' });
@@ -71,6 +86,7 @@ export function useJobRows(
   if (params.field) query.set('field', params.field);
   if (params.search) query.set('search', params.search);
   if (params.enrichment) query.set('enrichment', params.enrichment);
+  if (params.suggestion) query.set('suggestion', params.suggestion);
   return useQuery({
     queryKey: jobKeys.rows(jobId, params),
     queryFn: ({ signal }) => apiRequest(`${jobPath(jobId)}/rows?${query.toString()}`, rowListSchema, { signal }),
@@ -180,5 +196,63 @@ export function useUsage(enabled = true) {
     queryKey: ['usage'],
     queryFn: ({ signal }) => apiRequest('/usage', usageSummarySchema, { signal }),
     enabled,
+  });
+}
+
+/** After a review decision: refresh the job (its review counts), rows, activity and the dashboard. */
+function useReviewChanged(jobId: string) {
+  const queryClient = useQueryClient();
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: jobKeys.detail(jobId) }),
+      queryClient.invalidateQueries({ queryKey: ['jobs', 'rows', jobId] }),
+      queryClient.invalidateQueries({ queryKey: ['jobs', 'activity', jobId] }),
+    ]);
+}
+
+export function useReviewSuggestion(jobId: string) {
+  const changed = useReviewChanged(jobId);
+  return useMutation({
+    mutationFn: ({ rowId, ...input }: ReviewActionInput & { rowId: string }) =>
+      apiRequest(`${jobPath(jobId)}/rows/${encodeURIComponent(rowId)}`, catalogRowSchema, { method: 'PATCH', body: input }),
+    onSuccess: changed,
+  });
+}
+
+export function useBulkReview(jobId: string) {
+  const changed = useReviewChanged(jobId);
+  return useMutation({
+    mutationFn: ({ action, ...input }: BulkReviewInput & { action: 'approve' | 'reject' }) =>
+      apiRequest(`${jobPath(jobId)}/${action}`, bulkReviewResultSchema, { method: 'POST', body: input }),
+    onSuccess: changed,
+  });
+}
+
+export function useJobActivity(jobId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['jobs', 'activity', jobId],
+    queryFn: ({ signal }) => apiRequest(`${jobPath(jobId)}/activity`, z.array(auditEntrySchema), { signal }),
+    enabled,
+  });
+}
+
+export function useJobExports(jobId: string) {
+  return useQuery({
+    queryKey: ['jobs', 'exports', jobId],
+    queryFn: ({ signal }) => apiRequest(`${jobPath(jobId)}/exports`, z.array(exportSchema), { signal }),
+  });
+}
+
+export function useCreateExport(jobId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ExportRequestInput) => apiRequest(`${jobPath(jobId)}/export`, exportSchema, { method: 'POST', body: input }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['jobs', 'exports', jobId] }),
+        queryClient.invalidateQueries({ queryKey: jobKeys.detail(jobId) }),
+        queryClient.invalidateQueries({ queryKey: ['jobs', 'activity', jobId] }),
+        queryClient.invalidateQueries({ queryKey: dashboardSummaryKey }),
+      ]),
   });
 }

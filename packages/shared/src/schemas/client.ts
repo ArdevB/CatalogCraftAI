@@ -126,6 +126,9 @@ export const dashboardSummarySchema = z.object({
     needsReview: z.number().int().min(0),
     failed: z.number().int().min(0),
   }),
+  recentExports: z.array(
+    z.object({ id: z.string(), jobId: z.string(), filename: z.string(), rowCount: z.number().int(), createdAt: z.iso.datetime() }),
+  ),
   recentJobs: z.array(
     z.object({
       id: z.string(),

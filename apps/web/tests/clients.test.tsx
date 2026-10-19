@@ -297,6 +297,7 @@ describe('dashboard', () => {
           clients: { used: 2, limit: null },
           recentClients: [{ id: 'e'.repeat(24), name: 'Recent Co', updatedAt: '2026-10-10T00:00:00.000Z' }],
           products: { used: 120, limit: 2500 },
+          recentExports: [],
           jobs: { active: 1, activeLimit: null, needsReview: 0, failed: 1 },
           recentJobs: [
             { id: 'f'.repeat(24), name: 'Spring import', status: 'failed', clientName: 'Recent Co', updatedAt: '2026-10-11T00:00:00.000Z' },
@@ -322,6 +323,7 @@ describe('dashboard', () => {
           clients: { used: 0, limit: 1 },
           recentClients: [],
           products: { used: 0, limit: 25 },
+          recentExports: [],
           jobs: { active: 0, activeLimit: 1, needsReview: 0, failed: 0 },
           recentJobs: [],
         }),

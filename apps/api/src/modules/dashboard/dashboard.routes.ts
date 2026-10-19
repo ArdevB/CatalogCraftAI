@@ -9,6 +9,7 @@ import { CatalogJobModel } from '../catalog-jobs/catalog-job.model.js';
 import { ClientModel } from '../clients/client.model.js';
 import { getWorkspaceAllowance } from '../clients/client.service.js';
 import { OrganizationModel } from '../organizations/organization.model.js';
+import { ExportModel } from '../exports/export.model.js';
 import { getUsage } from '../usage/usage.service.js';
 
 /**
@@ -22,7 +23,7 @@ export function dashboardRouter(): Router {
   router.get('/summary', async (req, res) => {
     const auth = getAuth(req);
     const scope = tenantScope(auth);
-    const [organization, clients, recentClients, active, needsReview, failed, recentJobs, usage] = await Promise.all([
+    const [organization, clients, recentClients, active, needsReview, failed, recentJobs, usage, recentExports] = await Promise.all([
       OrganizationModel.findById(auth.organizationId).select('plan').lean(),
       getWorkspaceAllowance(auth),
       ClientModel.find(scope).sort({ updatedAt: -1 }).limit(5).select('name updatedAt').lean(),
@@ -31,6 +32,7 @@ export function dashboardRouter(): Router {
       CatalogJobModel.countDocuments({ ...scope, status: 'failed' }),
       CatalogJobModel.find(scope).sort({ updatedAt: -1 }).limit(5).select('name status clientId updatedAt').lean(),
       getUsage(auth.organizationId, null),
+      ExportModel.find(scope).sort({ createdAt: -1 }).limit(5).select('jobId filename rowCount createdAt').lean(),
     ]);
     if (!organization) throw new AppError('NOT_FOUND', 'Organization not found.');
 
@@ -49,6 +51,13 @@ export function dashboardRouter(): Router {
       })),
       products: { used: usage.products.used, limit: usage.products.limit },
       jobs: { active, activeLimit: planLimits(organization.plan).maxActiveJobs, needsReview, failed },
+      recentExports: recentExports.map((item) => ({
+        id: item._id.toString(),
+        jobId: item.jobId.toString(),
+        filename: item.filename,
+        rowCount: item.rowCount,
+        createdAt: item.createdAt.toISOString(),
+      })),
       recentJobs: recentJobs.map((job) => ({
         id: job._id.toString(),
         name: job.name,

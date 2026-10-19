@@ -28,6 +28,8 @@ export const PERMISSIONS = {
   'jobs:read': ['owner', 'admin', 'editor', 'reviewer'],
   'jobs:edit': ['owner', 'admin', 'editor'],
   'suggestions:review': ['owner', 'admin', 'reviewer'],
+  'exports:create': ['owner', 'admin', 'editor', 'reviewer'],
+  'audit:read': ['owner', 'admin'],
   'usage:read': ['owner', 'admin'],
 } as const satisfies Record<string, readonly Role[]>;
 

@@ -23,6 +23,8 @@ export function toRowDto(row: CatalogRow & { _id: Types.ObjectId }): CatalogRowD
       model: suggestion.model,
       promptVersion: suggestion.promptVersion,
       generatedAt: suggestion.generatedAt.toISOString(),
+      editedValue: suggestion.editedValue ?? null,
+      reviewedAt: suggestion.reviewedAt?.toISOString() ?? null,
     })),
     enrichment: row.enrichment
       ? {
@@ -47,6 +49,11 @@ export async function listRows(auth: AuthContext, jobId: string, query: RowListQ
     ...(query.status ? { status: query.status } : {}),
     ...(query.field ? { 'validationIssues.field': query.field } : {}),
     ...(query.enrichment ? { 'enrichment.status': query.enrichment } : {}),
+    ...(query.suggestion === 'any'
+      ? { 'suggestions.0': { $exists: true } }
+      : query.suggestion
+        ? { 'suggestions.status': query.suggestion }
+        : {}),
     ...(search ? { $or: [{ sourceIdentifier: search }, { 'original.title': search }] } : {}),
   };
 

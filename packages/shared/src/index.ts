@@ -7,4 +7,5 @@ export * from './schemas/enrichment.js';
 export * from './schemas/health.js';
 export * from './schemas/language.js';
 export * from './schemas/organization.js';
+export * from './schemas/review.js';
 export * from './schemas/roles.js';

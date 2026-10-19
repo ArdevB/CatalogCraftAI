@@ -254,6 +254,7 @@ describe('client tenant isolation', () => {
       products: { used: 0, limit: 25 },
       jobs: { active: 0, activeLimit: 1, needsReview: 0, failed: 0 },
       recentJobs: [],
+      recentExports: [],
     });
   });
 });

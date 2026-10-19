@@ -8,6 +8,7 @@ import { useDashboardSummary } from '@/features/clients/use-clients';
 import { RoleBadge } from '@/features/organization/role-badge';
 import { SystemStatusCard } from '@/features/system/system-status-card';
 import { JobStatusBadge } from '@/features/jobs/job-status';
+import { apiUrl } from '@/lib/api-client';
 import { PLAN_LABELS } from '@/lib/plans';
 
 function Stat({ label, value, detail }: { label: string; value: string; detail?: string }) {
@@ -38,7 +39,7 @@ function Summary() {
     );
   }
 
-  const { clients, plan, recentClients, jobs, recentJobs, products } = summary.data;
+  const { clients, plan, recentClients, jobs, recentJobs, products, recentExports } = summary.data;
   return (
     <div className="flex flex-col gap-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -97,10 +98,38 @@ function Summary() {
       </Card>
 
       <Card>
+        <CardHeader>
+          <CardTitle>Recent exports</CardTitle>
+          <CardDescription>Clean CSV files ready to download.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {recentExports.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No exports yet. Review a job’s suggestions, then export it as CSV.</p>
+          ) : (
+            <ul className="divide-y">
+              {recentExports.map((item) => (
+                <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-sm">
+                  <Link to={`/jobs/${item.jobId}`} className="min-w-0 truncate font-medium text-primary hover:underline">
+                    {item.filename}
+                  </Link>
+                  <span className="flex items-center gap-3 text-muted-foreground">
+                    {item.rowCount.toLocaleString()} rows
+                    <a className="font-medium text-primary hover:underline" href={apiUrl(`/exports/${item.id}/download`)}>
+                      Download
+                    </a>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader className="flex-row items-center justify-between gap-4 space-y-0">
           <div className="flex flex-col gap-1.5">
             <CardTitle>Recently updated clients</CardTitle>
-            <CardDescription>Catalogue job statistics will appear here once imports are available.</CardDescription>
+            <CardDescription>Each client’s brand profile guides its AI suggestions.</CardDescription>
           </div>
           {recentClients.length > 0 ? (
             <Button asChild variant="outline" size="sm">

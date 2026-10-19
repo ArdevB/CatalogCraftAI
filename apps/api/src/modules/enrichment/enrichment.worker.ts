@@ -183,7 +183,12 @@ export class EnrichmentWorker {
       (existing) => KEEP_STATUSES.has(existing.status) || !generated.has(existing.field),
     );
     const keptFields = new Set(kept.map((suggestion) => suggestion.field));
-    const suggestions = [...kept, ...result.suggestions.filter((suggestion) => !keptFields.has(suggestion.field))];
+    const suggestions = [
+      ...kept,
+      ...result.suggestions
+        .filter((suggestion) => !keptFields.has(suggestion.field))
+        .map((suggestion) => ({ ...suggestion, blocked: suggestion.status === 'failed' })),
+    ];
 
     await CatalogRowModel.updateOne(
       { _id: row._id },

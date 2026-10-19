@@ -2,7 +2,7 @@
 
 Multi-tenant SaaS for ecommerce agencies: import messy supplier catalogues (CSV/XLSX), validate them, generate AI suggestions for selected fields, review every change, and export a clean CSV — with product facts and protected fields (SKU, price, stock, barcodes…) never altered by AI.
 
-> **Status: Phase 3 (AI enrichment) complete.** Accounts, organizations and roles, client workspaces, plan limits, a live dashboard, the full import workflow (upload, mapping, validation), and AI enrichment — background generation of title/description/SEO/tag suggestions with guardrails, usage tracking and plan limits — are working. Human review (approve/edit/reject) and CSV export are **not implemented yet** — see [Roadmap](#roadmap).
+> **Status: Phase 4 (Review & export) complete — the full CSV workflow works end to end.** Import a supplier file, validate it, generate AI suggestions, review them (approve / edit / reject, bulk approve), and export a clean CSV with protected values untouched. Every review decision and export is audit-logged. Remaining: Phase 5–6 polish and pilot readiness — see [Roadmap](#roadmap).
 
 ---
 
@@ -156,6 +156,14 @@ State-changing requests (`POST`/`PUT`/`PATCH`/`DELETE`) must include the header 
 | GET | `/api/v1/jobs/:jobId/rows?status=&field=&search=&enrichment=&page=` | `jobs:read` | Paginated rows with original values, validation issues, AI suggestions and enrichment status. |
 | POST | `/api/v1/jobs/:jobId/enrich` | `jobs:edit` | `{ fields: ["title","description","seoTitle","seoDescription","tags"], language?, includeWarningRows? }` → `202`, job `queued`. `503 AI_NOT_CONFIGURED` without a key; `403 PLAN_LIMIT_REACHED` over the monthly allowance. |
 | POST | `/api/v1/jobs/:jobId/enrich/cancel` | `jobs:edit` | Stops a queued or running enrichment; suggestions already made are kept. |
+| PATCH | `/api/v1/jobs/:jobId/rows/:rowId` | `suggestions:review` | `{ field, action: "approve" \| "reject" \| "edit" \| "reset", value? }` — one decision on one suggestion. Blocked suggestions can't be approved as written; edits are checked against the client's prohibited claims. |
+| POST | `/api/v1/jobs/:jobId/approve` | `suggestions:review` | `{ rowIds?, fields? }` — bulk approve **pending suggestions without warnings** only. |
+| POST | `/api/v1/jobs/:jobId/reject` | `suggestions:review` | `{ rowIds?, fields? }` — bulk reject pending suggestions. |
+| GET | `/api/v1/jobs/:jobId/activity` | `audit:read` | Latest review/export actions on the job (who, what, when — never product text). |
+| POST | `/api/v1/jobs/:jobId/export` | `exports:create` | `{ fields, includeUnmappedColumns?, includeErrorRows? }` → CSV stored privately; job becomes `completed`. |
+| GET | `/api/v1/jobs/:jobId/exports` | `jobs:read` | The job's exports. |
+| GET | `/api/v1/exports/:exportId` | `jobs:read` | Export details. |
+| GET | `/api/v1/exports/:exportId/download` | `jobs:read` | The CSV file (`Content-Disposition: attachment`, `no-store`). Checked against your organization and logged on every download. |
 | GET | `/api/v1/usage` | `usage:read` | This month: products enriched / reserved / limit, AI requests, failures, tokens, estimated cost, AI status. |
 | GET | `/api/v1/ai/status` | signed in | `{ configured, model }`. |
 | GET | `/api/v1/dashboard/summary` | signed in | Plan, client workspace count vs. limit, 5 most recently updated clients. |
@@ -198,6 +206,19 @@ Permissions are defined once in [`packages/shared/src/schemas/roles.ts`](package
 - **Background worker without Redis:** the job document is the queue. The worker claims a job atomically with a time-limited lease, processes a few products at a time, saves after each, and a crashed run resumes when its lease expires. Cancellation is checked between batches. A bad key/model stops the run at once; repeated service failures pause it.
 - **Usage:** an append-only `UsageEvent` per AI request (tokens, model). A product counts towards the monthly allowance only when enrichment **succeeds**; failures are free. Before starting, the request is checked against used + reserved (running jobs) + requested.
 - **Refusal fallback:** on models that support it, Anthropic's server-side fallback re-runs a declined request on a suitable model; otherwise the row is marked failed.
+
+### Review and export
+
+- **Review** (owners, admins, reviewers): each suggestion is `pending` → `approved`, `edited` (reviewer's own text, AI text kept for comparison), `rejected`, or back to pending with *Undo*. A suggestion a guardrail **blocked** (`failed`) can't be approved as written — a reviewer can edit it into compliant text. Bulk approve only touches pending suggestions **without warnings**; anything flagged needs a person.
+- **Export** ([`services/export`](apps/api/src/services/export)):
+  - columns keep the **supplier file's order**, so the result re-imports where it came from; requested content fields the file lacked (e.g. SEO title) are added at the end when at least one product has an approved value;
+  - **only approved/edited text** replaces content fields — pending, rejected and blocked suggestions never appear;
+  - every other cell (SKU, price, stock, barcode, variant links, unmapped columns) is copied **exactly as imported**, untrimmed;
+  - **formula injection** protection: text cells (and headers) starting with `=` `+` `-` `@`, tab or CR get a leading `'`; plain numbers such as `-3` are left alone;
+  - rows with validation errors are left out unless requested; UTF-8 with BOM so Excel shows accents correctly;
+  - files are stored privately under generated keys and only served through the authorised download route.
+- **Audit log:** `AuditLog` records approvals, edits, rejections, undo, bulk actions (with counts), exports and downloads — ids, field names and counts only, never product text.
+- **Lifecycle:** export moves the job to `completed`; a completed job can still be reviewed, exported again, or enriched further. Deleting a job deletes its rows, source file, exports and their files.
 
 ### AI costs
 
@@ -274,5 +295,5 @@ Full deployment docs come with pilot readiness (Phase 6). The shape will be:
 - [ ] Later: team invitations by email, account & organization deletion policy, audit log
 - [x] **Phase 2 — File import:** catalogue jobs with a state machine, CSV/XLSX upload with private storage, worksheet & header-row selection, column mapping with suggestions, preview, deterministic validation, row-level report, job history
 - [x] **Phase 3 — AI enrichment:** provider abstraction (Anthropic), versioned prompt, structured & validated output, guardrails, background worker with leases and cancellation, usage ledger, monthly limits, usage page
-- [ ] **Phase 4 — Review & export:** review table, approve/edit/reject, audit log, safe CSV export
+- [x] **Phase 4 — Review & export:** review table with approve/edit/reject/undo, bulk approve (warning-free only), audit log & activity, safe CSV export with authorised downloads, recent exports on the dashboard
 - [ ] **Phase 5–6 — Agency workflow & pilot readiness**

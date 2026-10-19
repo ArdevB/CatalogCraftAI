@@ -28,6 +28,12 @@ const suggestionSchema = new Schema(
     model: { type: String, required: true },
     promptVersion: { type: String, required: true },
     generatedAt: { type: Date, required: true },
+    /** Set when a guardrail rejected the AI text (e.g. a prohibited claim). Blocked text can never be approved as-is. */
+    blocked: { type: Boolean, default: false },
+    /** The reviewer's own text when status is `edited`. */
+    editedValue: { type: String, default: null, maxlength: 5_000 },
+    reviewedAt: { type: Date, default: null },
+    reviewedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
   },
   { _id: false },
 );

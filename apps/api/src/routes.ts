@@ -10,6 +10,7 @@ import { jobsRouter } from './modules/catalog-jobs/catalog-job.routes.js';
 import { clientsRouter } from './modules/clients/client.routes.js';
 import { dashboardRouter } from './modules/dashboard/dashboard.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
+import { exportsRouter, reviewRouter } from './modules/review/review.routes.js';
 import { organizationsRouter } from './modules/organizations/organization.routes.js';
 import { aiStatusRouter, enrichmentRouter, usageRouter } from './modules/enrichment/enrichment.routes.js';
 import type { AiProvider } from './services/ai/provider.js';
@@ -46,6 +47,8 @@ export function apiV1Router(deps: RouteDependencies): Router {
   router.use('/dashboard', dashboardRouter());
   router.use('/jobs', jobsRouter({ config: deps.config, storage: deps.storage }));
   router.use('/jobs', enrichmentRouter(deps.ai));
+  router.use('/jobs', reviewRouter(deps.storage));
+  router.use('/exports', exportsRouter(deps.storage));
   router.use('/usage', usageRouter(deps.ai));
   router.use('/ai', aiStatusRouter(deps.ai));
 

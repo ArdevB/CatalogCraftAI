@@ -6,12 +6,14 @@ import { ErrorState, errorMessage, LoadingState } from '@/components/page-states
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { usePermission } from '@/features/auth/use-session';
+import { ActivityCard } from '@/features/jobs/activity-card';
 import { EnrichmentPanel } from '@/features/jobs/enrichment-panel';
+import { ExportPanel } from '@/features/jobs/export-panel';
 import { EnrichmentProgress } from '@/features/jobs/enrichment-progress';
 import { formatBytes, JobStatusBadge } from '@/features/jobs/job-status';
 import { MappingStep } from '@/features/jobs/mapping-step';
 import { UploadStep } from '@/features/jobs/upload-step';
-import { SuggestionsTable } from '@/features/jobs/suggestions-table';
+import { ReviewTable } from '@/features/jobs/review-table';
 import { useDeleteJob, useJob } from '@/features/jobs/use-jobs';
 import { ValidationReport } from '@/features/jobs/validation-report';
 import { ApiError } from '@/lib/api-client';
@@ -35,6 +37,8 @@ function progress(job: Job): { current: number; completed: number } {
     case 'queued':
     case 'processing':
       return { current: 3, completed: 3 };
+    case 'completed':
+      return { current: 4, completed: 5 };
     default:
       return { current: 4, completed: 4 };
   }
@@ -61,7 +65,6 @@ function Stepper({ job }: { job: Job }) {
             </span>
             <span className={cn(index > current && 'text-muted-foreground')}>
               {label}
-              {index === 4 ? <span className="text-muted-foreground"> (coming next)</span> : null}
             </span>
           </li>
         );
@@ -131,6 +134,8 @@ function JobBody({ job, view, setView }: { job: Job; view: View; setView: (view:
     case 'processing':
       return <EnrichmentProgress job={job} />;
     case 'review':
+    case 'completed':
+    case 'exporting':
       return (
         <div className="flex flex-col gap-6">
           {job.lastError ? <Alert variant="destructive">{job.lastError}</Alert> : null}
@@ -141,7 +146,9 @@ function JobBody({ job, view, setView }: { job: Job; view: View; setView: (view:
               </Button>
             </div>
           ) : null}
-          <SuggestionsTable job={job} />
+          {job.review ? <ReviewTable job={job} /> : null}
+          {job.status !== 'exporting' ? <ExportPanel job={job} /> : <LoadingState label="Creating the export…" />}
+          <ActivityCard jobId={job.id} />
           <ValidationReport job={job} />
         </div>
       );
@@ -162,6 +169,7 @@ function JobBody({ job, view, setView }: { job: Job; view: View; setView: (view:
           {canEdit && job.counts.totalRows > 0 && (job.status === 'ready' || (job.status === 'failed' && job.enrichment)) ? (
             <EnrichmentPanel job={job} />
           ) : null}
+          {job.status === 'ready' ? <ExportPanel job={job} /> : null}
           {job.counts.totalRows > 0 ? <ValidationReport job={job} /> : null}
         </div>
       );

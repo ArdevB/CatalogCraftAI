@@ -37,8 +37,23 @@ export const suggestionSchema = z.object({
   model: z.string(),
   promptVersion: z.string(),
   generatedAt: z.iso.datetime(),
+  /** The reviewer's own text when status is `edited` (the AI's `value` is kept for comparison). */
+  editedValue: z.string().nullable(),
+  reviewedAt: z.iso.datetime().nullable(),
 });
 export type Suggestion = z.infer<typeof suggestionSchema>;
+
+/** How many suggestions in a job are in each review state. */
+export const reviewSummarySchema = z.object({
+  pending: z.number().int(),
+  approved: z.number().int(),
+  edited: z.number().int(),
+  rejected: z.number().int(),
+  failed: z.number().int(),
+  /** Pending suggestions without warnings — what "approve all eligible" would approve. */
+  eligibleForBulkApproval: z.number().int(),
+});
+export type ReviewSummary = z.infer<typeof reviewSummarySchema>;
 
 export const ROW_ENRICHMENT_STATUSES = ['queued', 'done', 'failed', 'skipped'] as const;
 export const rowEnrichmentSchema = z.object({

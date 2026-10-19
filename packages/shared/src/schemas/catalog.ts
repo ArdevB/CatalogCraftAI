@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { objectIdSchema, paginationMetaSchema, paginationQuerySchema } from './common.js';
-import { jobEnrichmentSchema, ROW_ENRICHMENT_STATUSES, rowEnrichmentSchema, suggestionSchema } from './enrichment.js';
+import {
+  jobEnrichmentSchema,
+  reviewSummarySchema,
+  ROW_ENRICHMENT_STATUSES,
+  rowEnrichmentSchema,
+  suggestionSchema,
+  suggestionStatusSchema,
+} from './enrichment.js';
 
 /* -------------------------------------------------------------------------- */
 /* Standard product fields                                                    */
@@ -84,15 +91,17 @@ export const JOB_TRANSITIONS: Readonly<Record<JobStatus, readonly JobStatus[]>> 
   draft: ['uploaded'],
   uploaded: ['uploaded', 'validating'],
   validating: ['ready', 'failed'],
-  ready: ['uploaded', 'validating', 'queued'],
+  ready: ['uploaded', 'validating', 'queued', 'exporting'],
   // ready/review: cancelled before the worker started (review if earlier suggestions exist).
   queued: ['processing', 'ready', 'review'],
   // ready: enrichment cancelled before anything succeeded.
   processing: ['review', 'failed', 'ready'],
   // queued: enrich more fields (or remaining rows) after reviewing.
   review: ['queued', 'exporting', 'completed'],
-  exporting: ['review', 'completed', 'failed'],
-  completed: ['exporting'],
+  // review/ready: the export failed, so the job returns to where it was.
+  exporting: ['completed', 'review', 'ready', 'failed'],
+  // queued: generate more suggestions after an export; exporting: export again.
+  completed: ['exporting', 'queued'],
   // queued: retry an enrichment that stopped (e.g. the AI service was unavailable).
   failed: ['uploaded', 'validating', 'queued'],
 };
@@ -237,6 +246,8 @@ export const jobSchema = z.object({
   /** Why the job failed, in words the user can act on. */
   lastError: z.string().nullable(),
   enrichment: jobEnrichmentSchema.nullable(),
+  /** `null` until AI suggestions exist. */
+  review: reviewSummarySchema.nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
@@ -249,7 +260,7 @@ export const jobListQuerySchema = paginationQuerySchema.extend({
 export type JobListQuery = z.infer<typeof jobListQuerySchema>;
 
 export const jobListSchema = z.object({
-  items: z.array(jobSchema.omit({ importConfig: true, issueSummary: true })),
+  items: z.array(jobSchema.omit({ importConfig: true, issueSummary: true, review: true })),
   pagination: paginationMetaSchema,
 });
 export type JobList = z.infer<typeof jobListSchema>;
@@ -278,6 +289,8 @@ export const rowListQuerySchema = paginationQuerySchema.extend({
   field: z.string().max(40).optional(),
   search: z.string().trim().max(100).optional(),
   enrichment: z.enum(ROW_ENRICHMENT_STATUSES).optional(),
+  /** Rows with at least one suggestion in this review state (`any`: rows with any suggestion). */
+  suggestion: z.union([suggestionStatusSchema, z.literal('any')]).optional(),
 });
 export type RowListQuery = z.infer<typeof rowListQuerySchema>;
 
