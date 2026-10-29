@@ -47,17 +47,20 @@ describe('sidebar navigation', () => {
     expect(screen.queryByRole('link', { name: 'Usage' })).not.toBeInTheDocument();
   });
 
-  it('collapses to an icon rail, keeps links readable, and remembers the choice', async () => {
+  it('starts as a slim icon rail, keeps links readable, and remembers when it is expanded', async () => {
     mockSignedIn();
     const view = renderRoute('/dashboard');
-    await userEvent.click(await screen.findByRole('button', { name: 'Collapse sidebar' }));
-    expect(screen.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('link', { name: 'Clients' })).toBeInTheDocument(); // the label is now a tooltip, still its name
-    expect(localStorage.getItem('catalogcraft:sidebar-collapsed')).toBe('1');
+    const expand = await screen.findByRole('button', { name: 'Expand sidebar' });
+    expect(expand).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('link', { name: 'Clients' })).toBeInTheDocument(); // the label is a tooltip, still its name
+
+    await userEvent.click(expand);
+    expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toHaveAttribute('aria-pressed', 'false');
+    expect(localStorage.getItem('catalogcraft:sidebar-collapsed')).toBe('0');
 
     view.unmount();
     renderRoute('/dashboard');
-    expect(await screen.findByRole('button', { name: 'Expand sidebar' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Collapse sidebar' })).toBeInTheDocument();
   });
 
   it('becomes a drawer on small screens that closes with Escape or after choosing a page', async () => {

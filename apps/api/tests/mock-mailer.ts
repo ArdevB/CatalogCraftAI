@@ -3,6 +3,7 @@ import type { EmailMessage, Mailer } from '../src/services/email/mailer.js';
 /** Keeps sent emails in memory so tests can read them (and follow their links). */
 export class CaptureMailer implements Mailer {
   readonly enabled = true;
+  readonly delivery = 'smtp';
   readonly sent: EmailMessage[] = [];
   fail = false;
 

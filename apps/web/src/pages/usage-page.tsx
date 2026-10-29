@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePermission } from '@/features/auth/use-session';
 import { ProgressRing } from '@/features/dashboard/charts';
-import { useCountUp } from '@/features/dashboard/stat-card';
+import { CountUp } from '@/features/dashboard/stat-card';
 import { useUsage } from '@/features/jobs/use-jobs';
 import { PLAN_LABELS } from '@/lib/plans';
 import { cn } from '@/lib/utils';
@@ -44,7 +44,6 @@ function LimitBar({ used, limit }: { used: number; limit: number | null }) {
 export function UsagePage() {
   const canSee = usePermission('usage:read');
   const usage = useUsage(canSee);
-  const shownUsed = useCountUp(usage.data?.products.used ?? 0);
 
   if (!canSee) return <Alert>Only owners and admins can see usage and plan details.</Alert>;
   if (usage.isPending) {
@@ -92,7 +91,7 @@ export function UsagePage() {
           </ProgressRing>
           <div className="flex flex-1 flex-col gap-3 self-stretch sm:justify-center">
             <p className="text-4xl font-semibold tracking-tight tabular-nums" aria-label={used.toLocaleString()}>
-              <span aria-hidden>{shownUsed.toLocaleString()}</span>
+              <CountUp value={used} />
               <span className="text-base font-normal text-muted-foreground"> / {limit === null ? 'unlimited' : limit.toLocaleString()}</span>
             </p>
             {limit !== null ? (

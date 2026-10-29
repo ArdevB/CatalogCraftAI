@@ -12,8 +12,8 @@ const PROMISES = [
 function Showcase() {
   return (
     <div aria-hidden className="relative hidden overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-sky-500 p-10 text-white shadow-2xl shadow-indigo-500/20 lg:flex lg:flex-col lg:justify-between">
-      <div className="absolute -right-24 -top-24 size-80 rounded-full bg-white/15 blur-3xl animate-drift-a" />
-      <div className="absolute -bottom-32 -left-16 size-96 rounded-full bg-sky-300/25 blur-3xl animate-drift-b" />
+      <div className="absolute -right-24 -top-24 size-96 rounded-full bg-[radial-gradient(circle,rgb(255_255_255/0.35)_0%,transparent_65%)]  will-change-transform animate-drift-a" />
+      <div className="absolute -bottom-32 -left-16 size-[28rem] rounded-full bg-[radial-gradient(circle,var(--color-sky-300)_0%,transparent_65%)] opacity-50 will-change-transform animate-drift-b" />
       {/* A faint grid gives the gradient some texture. */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,rgb(255_255_255/0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgb(255_255_255/0.06)_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
 

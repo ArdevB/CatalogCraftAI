@@ -72,7 +72,7 @@ function ClientCard({ client, index }: { client: Client; index: number }) {
   const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
   return (
     <li
-      className="group relative flex flex-col gap-4 rounded-xl border bg-card p-5 shadow-[0_1px_2px_oklch(0.2_0.01_260/0.04)] transition-all duration-300 animate-rise focus-within:ring-2 focus-within:ring-ring hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg"
+      className="group relative flex flex-col gap-4 rounded-xl border bg-card p-5 shadow-[0_1px_2px_oklch(0.2_0.01_260/0.04)] transition-[transform,box-shadow,border-color] duration-300 animate-rise focus-within:ring-2 focus-within:ring-ring hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg"
       style={{ animationDelay: `${Math.min(index, 12) * 45}ms` }}
     >
       <div className="flex items-start gap-3">

@@ -185,7 +185,7 @@ export function ClientForm({
       </Card>
 
       {/* Stays in reach at the bottom of the screen while the form scrolls. */}
-      <div className="sticky bottom-4 z-10 flex gap-3 rounded-xl border bg-card/85 p-3 shadow-lg backdrop-blur-md animate-rise" style={{ animationDelay: '180ms' }}>
+      <div className="sticky bottom-4 z-10 flex gap-3 rounded-xl border bg-card/95 p-3 shadow-lg animate-rise" style={{ animationDelay: '180ms' }}>
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? <Loader2 className="animate-spin" aria-hidden /> : null}
           {isSubmitting ? pendingLabel : submitLabel}

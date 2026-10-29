@@ -41,7 +41,7 @@ export function apiV1Router(deps: RouteDependencies): Router {
 
   // What the sign-in pages may offer (e.g. "Forgot password?" needs email). No secrets.
   router.get('/features', (_req, res) => {
-    sendSuccess(res, { email: deps.email.mailer.enabled });
+    sendSuccess(res, { email: deps.email.mailer.enabled, emailDelivery: deps.email.mailer.delivery });
   });
 
   // Everything below needs MongoDB (including the session store).

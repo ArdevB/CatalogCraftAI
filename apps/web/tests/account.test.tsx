@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import type { Role, SessionInfo } from '@catalogcraft/shared';
@@ -97,5 +97,30 @@ describe('changing the password', () => {
     expect(await screen.findByText('Password changed. Other devices have been signed out.')).toBeInTheDocument();
     const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/auth/change-password'));
     expect(JSON.parse(String(call![1]!.body))).toEqual({ currentPassword: 'a-long-test-password', newPassword: 'a-brand-new-password' });
+  });
+});
+
+describe('email status on the account page', () => {
+  it('shows a verified badge once the address is confirmed', async () => {
+    mockApi({ 'GET /me': session() });
+    renderRoute('/settings/account');
+    expect(await screen.findByText('Verified')).toBeInTheDocument();
+    expect(screen.queryByText('Not verified')).not.toBeInTheDocument();
+  });
+
+  it('shows "Not verified" with a way to resend the link', async () => {
+    const unverified = { ...sessionInfo('owner'), user: { ...sessionInfo().user, emailVerified: false } };
+    const { fetchMock } = mockApi({
+      'GET /me': () => ok(unverified),
+      'GET /features': () => ok({ email: true, emailDelivery: 'smtp' }),
+      'POST /auth/resend-verification': () => ok(null),
+    });
+    renderRoute('/settings/account');
+
+    expect(await screen.findByText('Not verified')).toBeInTheDocument();
+    const card = screen.getByText('Not verified').closest('[class*="flex-wrap"]')!;
+    await userEvent.click(await within(card as HTMLElement).findByRole('button', { name: 'Resend link' }));
+    expect(await screen.findByText('New link sent — check your inbox.')).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/auth/resend-verification'))).toBe(true);
   });
 });

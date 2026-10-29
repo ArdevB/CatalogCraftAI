@@ -48,7 +48,9 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
 
 const COLLAPSED_KEY = 'catalogcraft:sidebar-collapsed';
 const WIDE = 264;
-const RAIL = 76;
+const RAIL = 72;
+/** Space around the floating sidebar on wide screens. */
+const GAP = 12;
 const EASE = 'ease-[cubic-bezier(0.2,0.8,0.2,1)]';
 
 /** Whether a media query matches; `fallback` where the browser can't tell (e.g. tests). */
@@ -67,9 +69,9 @@ function useMediaQuery(query: string, fallback: boolean): boolean {
 
 function readCollapsed(): boolean {
   try {
-    return localStorage.getItem(COLLAPSED_KEY) === '1';
+    return localStorage.getItem(COLLAPSED_KEY) !== '0';
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -96,7 +98,7 @@ function BrandLink({ rail }: { rail: boolean }) {
           ))}
         </svg>
       </span>
-      <span className={cn('truncate transition-all duration-300', EASE, rail ? 'pointer-events-none w-0 opacity-0' : 'opacity-100')}>CatalogCraft AI</span>
+      <span className={cn('truncate transition-opacity duration-300', EASE, rail ? 'pointer-events-none w-0 opacity-0' : 'opacity-100')}>CatalogCraft AI</span>
     </Link>
   );
 }
@@ -109,7 +111,7 @@ function OrganizationBlock({ rail }: { rail: boolean }) {
   const several = session.organizations.length > 1;
 
   return (
-    <div className={cn('flex items-center gap-3 rounded-xl border bg-background/60 p-2.5 transition-all duration-300', EASE, rail && 'justify-center border-transparent bg-transparent p-0')}>
+    <div className={cn('flex items-center gap-3 rounded-xl border bg-background/60 p-2.5 transition-[background-color,border-color] duration-300', EASE, rail && 'justify-center border-transparent bg-transparent p-0')}>
       <Avatar name={session.organization.name} className="rounded-lg" />
       <div className={cn('min-w-0 flex-1 transition-opacity duration-200', rail ? 'hidden' : 'opacity-100')}>
         {several ? (
@@ -176,17 +178,19 @@ function Navigation({ rail, onNavigate }: { rail: boolean; onNavigate: () => voi
         <div
           ref={highlightRef}
           aria-hidden
-          className={cn('pointer-events-none absolute inset-x-0 top-0 rounded-lg tint-indigo opacity-0 ring-1 ring-inset transition-[transform,height,opacity] duration-500', EASE)}
-        >
-          <span className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-indigo-500" />
-        </div>
+          className={cn(
+            'pointer-events-none absolute top-0 rounded-full bg-primary opacity-0 shadow-md shadow-primary/30 transition-[transform,height,opacity] duration-500',
+            rail ? 'left-1/2 w-10 -translate-x-1/2' : 'inset-x-0',
+            EASE,
+          )}
+        />
         {NAV_GROUPS.map((group, groupIndex) => {
           const items = group.items.filter((item) => !item.permission || hasPermission(session.role, item.permission));
           return (
             <div key={group.label} className="flex flex-col gap-1">
               <p
                 className={cn(
-                  'px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 transition-all duration-300',
+                  'px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 transition-opacity duration-300',
                   groupIndex === 0 ? 'pt-1' : 'pt-4',
                   rail && 'h-0 overflow-hidden p-0 opacity-0',
                 )}
@@ -202,9 +206,9 @@ function Navigation({ rail, onNavigate }: { rail: boolean; onNavigate: () => voi
                     onClick={onNavigate}
                     className={({ isActive }) =>
                       cn(
-                        'group relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium outline-none transition-colors duration-200 animate-slide-in-left focus-visible:ring-2 focus-visible:ring-ring',
-                        isActive ? 'text-indigo-700 dark:text-indigo-200' : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
-                        rail && 'justify-center px-0',
+                        'group relative flex h-10 items-center gap-3 rounded-full px-3 text-sm font-medium outline-none transition-colors duration-200 animate-slide-in-left focus-visible:ring-2 focus-visible:ring-ring',
+                        isActive ? 'text-primary-foreground' : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                        rail && 'mx-auto w-10 justify-center rounded-full px-0',
                       )
                     }
                     style={{ animationDelay: `${delay}ms` }}
@@ -216,7 +220,7 @@ function Navigation({ rail, onNavigate }: { rail: boolean; onNavigate: () => voi
                     {/* In the rail the label becomes a tooltip that slides out on hover or focus. */}
                     <span
                       className={cn(
-                        'relative whitespace-nowrap transition-all duration-300',
+                        'relative whitespace-nowrap transition-[opacity,translate] duration-300',
                         EASE,
                         rail &&
                           'pointer-events-none absolute left-full z-50 ml-4 -translate-x-2 rounded-md bg-foreground px-2.5 py-1.5 text-xs text-background opacity-0 shadow-lg group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100',
@@ -253,7 +257,7 @@ function UserBlock({ rail }: { rail: boolean }) {
           title="Sign out"
           disabled={logout.isPending}
           onClick={() => logout.mutate(undefined, { onSuccess: () => void navigate('/login', { replace: true }) })}
-          className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-all duration-200 hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-300 focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
+          className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors duration-200 hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-300 focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
         >
           {logout.isPending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <LogOut className="size-4" aria-hidden />}
         </button>
@@ -276,6 +280,24 @@ export function AuthenticatedLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const rail = isDesktop && collapsed;
   const hidden = !isDesktop && !drawerOpen;
+  const contentOffset = isDesktop ? (rail ? RAIL : WIDE) + GAP * 2 : 0;
+
+  // When the sidebar opens or closes, the page's left padding changes in one
+  // step (a single layout), then the page slides from where it was using only
+  // a transform — smooth, because the graphics card does the sliding ("FLIP").
+  const contentRef = useRef<HTMLDivElement>(null);
+  const previousOffset = useRef(contentOffset);
+  useLayoutEffect(() => {
+    const element = contentRef.current;
+    const delta = previousOffset.current - contentOffset;
+    previousOffset.current = contentOffset;
+    if (!element || delta === 0 || typeof element.animate !== 'function') return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    element.animate([{ transform: `translateX(${delta}px)` }, { transform: 'translateX(0)' }], {
+      duration: 300,
+      easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+    });
+  }, [contentOffset]);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
   const toggleCollapsed = () => {
@@ -315,7 +337,7 @@ export function AuthenticatedLayout() {
       </a>
 
       {/* Small screens: a top bar with a menu button. */}
-      <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-card/80 px-4 backdrop-blur-md lg:hidden">
+      <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-card/95 px-4 lg:hidden">
         <button
           type="button"
           aria-label="Open navigation"
@@ -334,7 +356,7 @@ export function AuthenticatedLayout() {
         aria-hidden
         onClick={closeDrawer}
         className={cn(
-          'fixed inset-0 z-40 bg-slate-900/25 backdrop-blur-[2px] transition-opacity duration-300 lg:hidden',
+          'fixed inset-0 z-40 bg-slate-900/30 transition-opacity duration-300 lg:hidden',
           drawerOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
       />
@@ -344,7 +366,7 @@ export function AuthenticatedLayout() {
         aria-label="Sidebar"
         inert={hidden}
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r bg-card/90 shadow-xl backdrop-blur-xl transition-[transform,width] duration-300 lg:translate-x-0 lg:shadow-none',
+          'fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r bg-card shadow-xl [contain:layout_style] transition-[transform,width] duration-300 lg:inset-y-3 lg:left-3 lg:translate-x-0 lg:rounded-3xl lg:border lg:shadow-[0_8px_30px_-12px_oklch(0.2_0.01_260/0.18)]',
           EASE,
           drawerOpen ? 'translate-x-0' : '-translate-x-full',
         )}
@@ -391,8 +413,8 @@ export function AuthenticatedLayout() {
         <UserBlock rail={rail} />
       </aside>
 
-      <div className={cn('transition-[padding] duration-300', EASE)} style={isDesktop ? { paddingLeft: rail ? RAIL : WIDE } : undefined}>
-        <main id="main" className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-10">
+      <div ref={contentRef} style={isDesktop ? { paddingLeft: contentOffset } : undefined}>
+        <main id="main" className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           {/* A fresh key per page replays the entrance animation on every navigation. */}
           <VerifyEmailBanner />
           <div key={location.pathname} className="animate-page">

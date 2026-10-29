@@ -136,6 +136,8 @@ With email set up, people confirm their address, reset forgotten passwords thems
    ```
 4. Test it: on the sign-in page, choose *Forgot password?* and use your own address.
 
+If the API log says **`525 5.7.1 Unauthorized IP address`**, Brevo is blocking logins from unknown IP addresses. In Brevo, open your account menu → **Security → Authorised IPs**. Either add the IP shown there, or turn IP blocking off. Hosts like Render have no fixed outgoing IP address, so in production turning it off is the practical choice; your SMTP key still protects the account.
+
 The API refuses to start if `EMAIL_DRIVER=smtp` is missing its host or sender, and it never allows the development `log` driver in production.
 
 ### Password resets without email

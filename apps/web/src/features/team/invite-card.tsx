@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { applyServerFieldErrors } from '@/features/auth/apply-server-errors';
+import { DevEmailNote } from '@/features/auth/dev-email-note';
 import { useFeatures, useRequiredSession } from '@/features/auth/use-session';
 import { useUsage } from '@/features/jobs/use-jobs';
 import { ROLE_LABELS, RoleBadge } from '@/features/organization/role-badge';
@@ -49,6 +50,7 @@ function InvitationLink({ email, link, emailed }: { email: string; link: string;
         {emailed ? '' : 'Send it to them yourself (email, chat…). '}It works once, only for this email address, and expires in {INVITATION_TTL_DAYS} days.
         You won’t be able to see it again — if it gets lost, invite them again.
       </p>
+      {emailed ? <DevEmailNote /> : null}
     </div>
   );
 }

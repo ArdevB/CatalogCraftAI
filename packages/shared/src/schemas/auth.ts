@@ -94,6 +94,11 @@ export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export const featuresSchema = z.object({
   /** Whether the server can send email (verification, password reset, invitations). */
   email: z.boolean(),
+  /**
+   * How email is delivered: `smtp` (really sent), `log` (development: written
+   * to the API terminal instead) or `none`.
+   */
+  emailDelivery: z.enum(['smtp', 'log', 'none']),
 });
 export type Features = z.infer<typeof featuresSchema>;
 

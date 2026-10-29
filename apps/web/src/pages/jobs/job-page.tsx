@@ -89,13 +89,13 @@ function Stepper({ job }: { job: Job }) {
             <li key={label} className="relative flex flex-col items-center gap-2 text-center" aria-current={index === current ? 'step' : undefined}>
               <span
                 className={cn(
-                  'relative grid size-10 place-items-center rounded-full border-2 bg-card transition-all duration-500',
+                  'relative isolate grid size-10 place-items-center rounded-full border-2 bg-card transition-[background-color,border-color,box-shadow] duration-500',
                   done && 'border-emerald-500 bg-emerald-500 text-white shadow-md shadow-emerald-500/30',
                   active && 'border-primary text-primary shadow-md shadow-primary/25',
                   !done && !active && 'border-border text-muted-foreground',
                 )}
               >
-                {active ? <span aria-hidden className="absolute inset-0 rounded-full text-primary animate-pulse-ring" /> : null}
+                {active ? <span aria-hidden className="absolute inset-0 -z-10 rounded-full text-primary animate-pulse-ring" /> : null}
                 {done ? <Check className="size-5 animate-pop" aria-hidden /> : <Icon className="size-[18px]" aria-hidden />}
               </span>
               <span className={cn('text-xs font-medium sm:text-sm', index > current ? 'text-muted-foreground' : 'text-foreground')}>{label}</span>

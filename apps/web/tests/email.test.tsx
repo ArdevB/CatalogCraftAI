@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { fail, mockApi, ok, renderRoute, sessionInfo, unauthenticated } from './utils';
 
 const TOKEN = 'R'.repeat(43);
-const features = (email: boolean) => () => ok({ email });
+const features = (email: boolean, emailDelivery = email ? 'smtp' : 'none') => () => ok({ email, emailDelivery });
 
 describe('forgot password', () => {
   it('is offered on the sign-in page', async () => {
@@ -24,6 +24,14 @@ describe('forgot password', () => {
     expect(screen.getByText(/If an account uses ada@example.test/)).toBeInTheDocument();
     const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/forgot-password'));
     expect(JSON.parse(String(call![1]!.body))).toEqual({ email: 'ada@example.test' });
+  });
+
+  it('says when emails are only printed in the terminal (development)', async () => {
+    mockApi({ 'GET /me': unauthenticated, 'GET /features': features(true, 'log'), 'POST /auth/forgot-password': () => ok(null) });
+    renderRoute('/forgot-password');
+    await userEvent.type(await screen.findByLabelText('Email'), 'ada@example.test');
+    await userEvent.click(screen.getByRole('button', { name: 'Email me a reset link' }));
+    expect(await screen.findByText(/emails aren’t really sent. Open the link printed in the API terminal/)).toBeInTheDocument();
   });
 
   it('points to the administrator when the server can’t send email', async () => {

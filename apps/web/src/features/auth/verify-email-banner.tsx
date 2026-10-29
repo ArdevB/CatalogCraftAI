@@ -2,6 +2,7 @@ import { Loader2, MailWarning, X } from 'lucide-react';
 import { useState } from 'react';
 import { errorMessage } from '@/components/page-states';
 import { Button } from '@/components/ui/button';
+import { DevEmailNote } from './dev-email-note';
 import { useFeatures, useRequiredSession, useResendVerification } from './use-session';
 
 /** Reminds a signed-in user to confirm their email (only when the server can send email). */
@@ -31,6 +32,7 @@ export function VerifyEmailBanner() {
       <button type="button" aria-label="Hide this reminder" onClick={() => setHidden(true)} className="grid size-7 place-items-center rounded-md hover:bg-black/5 dark:hover:bg-white/10">
         <X className="size-4" aria-hidden />
       </button>
+      <DevEmailNote className="basis-full bg-card/60" />
     </div>
   );
 }

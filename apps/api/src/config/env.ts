@@ -104,6 +104,16 @@ const envSchema = z.object({
     for (const key of ['SMTP_HOST', 'EMAIL_FROM'] as const) {
       if (!env[key]) ctx.addIssue({ code: 'custom', path: [key], message: `${key} is required when EMAIL_DRIVER=smtp.` });
     }
+    // "you@example.com" or "Name <you@example.com>" — a name alone is rejected by every provider.
+    const address = /^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/;
+    const from = env.EMAIL_FROM?.match(/<([^<>]+)>\s*$/)?.[1] ?? env.EMAIL_FROM;
+    if (env.EMAIL_FROM && !address.test(from ?? '')) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['EMAIL_FROM'],
+        message: 'EMAIL_FROM needs an email address, e.g. EMAIL_FROM=CatalogCraft <you@example.com> (a sender verified with your email provider).',
+      });
+    }
   }
   // Logged emails contain sign-in links: never in production.
   if (env.EMAIL_DRIVER === 'log' && env.NODE_ENV === 'production') {

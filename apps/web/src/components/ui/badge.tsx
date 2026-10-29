@@ -26,7 +26,7 @@ type BadgeProps = ComponentProps<'span'> &
 export function Badge({ className, variant, dot, children, ...props }: BadgeProps) {
   return (
     <span className={cn(badgeVariants({ variant }), 'rounded-full', className)} {...props}>
-      {dot ? <span aria-hidden className={cn('size-1.5 rounded-full bg-current', dot === 'live' && 'animate-pulse-ring')} /> : null}
+      {dot ? <span aria-hidden className={cn('relative size-1.5 rounded-full bg-current', dot === 'live' && 'animate-pulse-ring')} /> : null}
       {children}
     </span>
   );

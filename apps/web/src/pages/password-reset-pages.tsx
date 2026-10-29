@@ -11,6 +11,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { applyServerFieldErrors } from '@/features/auth/apply-server-errors';
 import { AuthCard } from '@/features/auth/auth-card';
+import { DevEmailNote } from '@/features/auth/dev-email-note';
 import { useFeatures, useForgotPassword, useResetPassword, useSession, useVerifyEmail } from '@/features/auth/use-session';
 
 const backToSignIn = (
@@ -48,10 +49,13 @@ export function ForgotPasswordPage() {
       ) : !features.data?.email ? (
         <Alert>Password resets by email aren’t set up on this server. Ask your agency’s administrator to reset your password for you.</Alert>
       ) : request.isSuccess ? (
-        <Outcome icon={MailCheck} tone="tint-emerald" title="Check your inbox">
-          If an account uses {form.getValues('email')}, we’ve sent it a link. It works once, for {PASSWORD_RESET_TTL_MINUTES} minutes. Check your spam folder if
-          it doesn’t arrive in a few minutes.
-        </Outcome>
+        <div className="flex flex-col gap-4">
+          <Outcome icon={MailCheck} tone="tint-emerald" title="Check your inbox">
+            If an account uses {form.getValues('email')}, we’ve sent it a link. It works once, for {PASSWORD_RESET_TTL_MINUTES} minutes. Check your spam folder
+            if it doesn’t arrive in a few minutes.
+          </Outcome>
+          <DevEmailNote />
+        </div>
       ) : (
         <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4">
           {request.isError ? <Alert variant="destructive">{errorMessage(request.error)}</Alert> : null}

@@ -177,8 +177,10 @@ describe('emailed invitations', () => {
 
 describe('email configuration', () => {
   it('reports whether email is available to the sign-in pages', async () => {
-    expect((await request(dbTestApp()).get('/api/v1/features')).body.data).toEqual({ email: false });
-    expect((await request(dbTestApp({}, { mailer: new CaptureMailer() })).get('/api/v1/features')).body.data).toEqual({ email: true });
+    expect((await request(dbTestApp()).get('/api/v1/features')).body.data).toEqual({ email: false, emailDelivery: 'none' });
+    expect((await request(dbTestApp({}, { mailer: new CaptureMailer() })).get('/api/v1/features')).body.data).toEqual({ email: true, emailDelivery: 'smtp' });
+    const logged = dbTestApp({}, { mailer: new LogMailer(pino({ level: 'silent' })) });
+    expect((await request(logged).get('/api/v1/features')).body.data).toEqual({ email: true, emailDelivery: 'log' });
   });
 
   it('defaults sensibly and refuses unsafe setups', () => {
@@ -186,6 +188,10 @@ describe('email configuration', () => {
     expect(testConfig({ APP_URL: 'https://app.example.test/' }).email.appUrl).toBe('https://app.example.test');
     expect(() => testConfig({ EMAIL_DRIVER: 'smtp' })).toThrow(/SMTP_HOST is required[\s\S]*EMAIL_FROM is required/);
     expect(() => testConfig({ NODE_ENV: 'production', EMAIL_DRIVER: 'log' })).toThrow(/development only/);
+    const smtp = { EMAIL_DRIVER: 'smtp', SMTP_HOST: 'smtp.example.test' };
+    expect(() => testConfig({ ...smtp, EMAIL_FROM: 'CatalogCraft' })).toThrow(/EMAIL_FROM needs an email address/);
+    expect(testConfig({ ...smtp, EMAIL_FROM: 'CatalogCraft <no-reply@example.test>' }).email.from).toBe('CatalogCraft <no-reply@example.test>');
+    expect(testConfig({ ...smtp, EMAIL_FROM: 'no-reply@example.test' }).email.driver).toBe('smtp');
     expect(testConfig({ NODE_ENV: 'production' }).email.driver).toBe('none');
 
     const logger = pino({ level: 'silent' });

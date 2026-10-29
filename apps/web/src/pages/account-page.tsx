@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CheckCircle2, Loader2, Trash2, UserRound } from 'lucide-react';
+import { BadgeCheck, CheckCircle2, Loader2, MailWarning, Trash2, UserRound } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router';
 import type { z } from 'zod';
@@ -8,14 +8,50 @@ import { FormField } from '@/components/form-field';
 import { PageHeader } from '@/components/page-header';
 import { errorMessage } from '@/components/page-states';
 import { Alert } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { applyServerFieldErrors } from '@/features/auth/apply-server-errors';
-import { useChangePassword, useRequiredSession } from '@/features/auth/use-session';
+import { useChangePassword, useFeatures, useRequiredSession, useResendVerification } from '@/features/auth/use-session';
 import { ROLE_LABELS } from '@/features/organization/role-badge';
 import { useDeleteAccount } from '@/features/organization/use-organization';
 import { avatarFor } from '@/features/dashboard/format';
 import { cn } from '@/lib/utils';
+
+/** Whether the address is confirmed, with a way to get a new link if it isn't. */
+function EmailStatus() {
+  const { user } = useRequiredSession();
+  const canEmail = useFeatures().data?.email ?? false;
+  const resend = useResendVerification();
+
+  if (user.emailVerified) {
+    return (
+      <Badge variant="success" className="animate-pop">
+        <BadgeCheck className="size-3.5" aria-hidden />
+        Verified
+      </Badge>
+    );
+  }
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      <Badge variant="warning">
+        <MailWarning className="size-3.5" aria-hidden />
+        Not verified
+      </Badge>
+      {canEmail ? (
+        resend.isSuccess ? (
+          <span className="text-xs text-success">New link sent — check your inbox.</span>
+        ) : (
+          <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" disabled={resend.isPending} onClick={() => resend.mutate()}>
+            {resend.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
+            Resend link
+          </Button>
+        )
+      ) : null}
+      {resend.isError ? <span className="text-xs text-destructive">{errorMessage(resend.error)}</span> : null}
+    </span>
+  );
+}
 
 function ChangePasswordCard() {
   const change = useChangePassword();
@@ -140,7 +176,10 @@ export function AccountPage() {
           </span>
           <div className="flex min-w-0 flex-col gap-1">
             <CardTitle>{user.name}</CardTitle>
-            <CardDescription className="truncate">{user.email}</CardDescription>
+            <CardDescription className="flex flex-wrap items-center gap-2">
+              <span className="truncate">{user.email}</span>
+              <EmailStatus />
+            </CardDescription>
           </div>
         </CardHeader>
         <CardContent>

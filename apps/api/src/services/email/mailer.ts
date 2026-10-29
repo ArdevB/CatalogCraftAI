@@ -11,12 +11,15 @@ export type EmailMessage = { to: string; subject: string; text: string; html: st
  */
 export interface Mailer {
   readonly enabled: boolean;
+  /** How messages leave the server; `log` means they are only written to the API log. */
+  readonly delivery: 'none' | 'log' | 'smtp';
   send(message: EmailMessage): Promise<void>;
 }
 
 /** No email configured (the production default until SMTP is set up). */
 export class DisabledMailer implements Mailer {
   readonly enabled = false;
+  readonly delivery = 'none';
   async send(): Promise<void> {
     throw new Error('Email is not configured.');
   }
@@ -29,9 +32,14 @@ export class DisabledMailer implements Mailer {
  */
 export class LogMailer implements Mailer {
   readonly enabled = true;
+  readonly delivery = 'log';
   constructor(private readonly logger: Logger) {}
   async send(message: EmailMessage): Promise<void> {
-    this.logger.info({ to: message.to, subject: message.subject }, `Email not sent (EMAIL_DRIVER=log):\n\n${message.text}\n`);
+    const link = /https?:\/\/\S+/.exec(message.text)?.[0];
+    this.logger.info(
+      `\n📧 EMAIL — development mode, not really sent (EMAIL_DRIVER=log)\n   To: ${message.to}\n   Subject: ${message.subject}\n` +
+        (link ? `   ➜ Open this link: ${link}\n` : `\n${message.text}\n`),
+    );
   }
 }
 
@@ -41,6 +49,7 @@ type Transport = { sendMail(mail: { from: string; to: string; subject: string; t
 /** Any SMTP provider (Brevo, Resend, Postmark, Mailgun, Gmail…). */
 export class SmtpMailer implements Mailer {
   readonly enabled = true;
+  readonly delivery = 'smtp';
   private readonly transport: Transport;
 
   constructor(

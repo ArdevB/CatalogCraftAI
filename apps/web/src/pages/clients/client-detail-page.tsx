@@ -97,8 +97,8 @@ function ClientDetail({ client }: { client: Client }) {
       {/* Hero: a soft colour banner with the client's avatar overlapping it. */}
       <Card className="overflow-hidden animate-rise">
         <div aria-hidden className="relative h-24 overflow-hidden bg-gradient-to-r from-indigo-500/20 via-violet-500/15 to-sky-500/20">
-          <div className="absolute -left-10 -top-16 size-48 rounded-full bg-indigo-400/30 blur-2xl animate-drift-a" />
-          <div className="absolute -bottom-20 right-10 size-56 rounded-full bg-sky-400/25 blur-2xl animate-drift-b" />
+          <div className="absolute -left-10 -top-16 size-64 rounded-full bg-[radial-gradient(circle,var(--color-indigo-400)_0%,transparent_65%)] opacity-50 will-change-transform animate-drift-a" />
+          <div className="absolute -bottom-20 right-10 size-72 rounded-full bg-[radial-gradient(circle,var(--color-sky-400)_0%,transparent_65%)] opacity-40 will-change-transform animate-drift-b" />
         </div>
         <div className="flex flex-col gap-4 px-6 pb-6 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex items-end gap-4">

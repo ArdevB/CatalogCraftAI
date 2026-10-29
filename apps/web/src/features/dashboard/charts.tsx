@@ -15,11 +15,26 @@ function useElementWidth<T extends HTMLElement>(fallback: number) {
   useEffect(() => {
     const element = ref.current;
     if (!element || typeof ResizeObserver === 'undefined') return;
+    // The first size applies at once. Later ones (e.g. while the sidebar slides open)
+    // wait until the size stops changing, so the chart redraws once, not every frame.
+    let first = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const observer = new ResizeObserver(([entry]) => {
-      if (entry) setWidth(Math.max(1, Math.round(entry.contentRect.width)));
+      if (!entry) return;
+      const next = Math.max(1, Math.round(entry.contentRect.width));
+      if (first) {
+        first = false;
+        setWidth(next);
+        return;
+      }
+      clearTimeout(timer);
+      timer = setTimeout(() => setWidth(next), 140);
     });
     observer.observe(element);
-    return () => observer.disconnect();
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+    };
   }, []);
   return [ref, width] as const;
 }
@@ -290,6 +305,47 @@ export function StackedBar({ segments, label }: { segments: Segment[]; label: st
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/** A half-circle gauge (like a speedometer) with content under the arc. */
+export function HalfGauge({
+  value,
+  max,
+  label,
+  children,
+  className,
+}: {
+  value: number;
+  max: number;
+  /** Accessible name, e.g. "Monthly products used". */
+  label: string;
+  children?: ReactNode;
+  className?: string;
+}) {
+  const percent = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  const arc = 'M 12 100 A 88 88 0 0 1 188 100';
+  // The filled part ends at this angle along the half circle (180° = empty, 0° = full).
+  const angle = Math.PI * (1 - percent / 100);
+  const end = { x: 100 + 88 * Math.cos(angle), y: 100 - 88 * Math.sin(angle) };
+  const filled = `M 12 100 A 88 88 0 0 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
+  return (
+    <div
+      role="meter"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={max}
+      aria-valuenow={value}
+      className={cn('relative mx-auto w-full max-w-[220px]', className)}
+    >
+      <svg viewBox="0 0 200 108" className="w-full overflow-visible">
+        <path d={arc} fill="none" className="stroke-muted" strokeWidth={18} strokeLinecap="round" />
+        {percent > 0 ? (
+          <path d={filled} fill="none" stroke="currentColor" strokeWidth={18} strokeLinecap="round" pathLength={1} className="animate-draw" />
+        ) : null}
+      </svg>
+      <div className="absolute inset-x-0 bottom-0 text-center">{children}</div>
     </div>
   );
 }

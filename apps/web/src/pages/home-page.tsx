@@ -40,8 +40,8 @@ export function HomePage() {
     <div className="grid gap-12 lg:grid-cols-[1fr_380px]">
       <section aria-labelledby="intro-heading" className="flex flex-col gap-8">
         <div className="flex flex-col gap-4">
-          <p className="inline-flex w-fit items-center gap-2 rounded-full border bg-card/70 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur animate-rise">
-            <span className="size-1.5 rounded-full bg-emerald-500 text-emerald-500 animate-pulse-ring" aria-hidden />
+          <p className="inline-flex w-fit items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted-foreground animate-rise">
+            <span className="relative size-1.5 rounded-full bg-emerald-500 text-emerald-500 animate-pulse-ring" aria-hidden />
             For ecommerce agencies
           </p>
           <h1 id="intro-heading" className="text-4xl font-semibold tracking-tight text-balance animate-rise sm:text-5xl" style={{ animationDelay: '60ms' }}>
@@ -62,7 +62,7 @@ export function HomePage() {
           {WORKFLOW.map(({ step, text, icon: Icon, tint }, index) => (
             <li
               key={step}
-              className="relative flex items-center gap-4 rounded-xl border bg-card/80 p-3 pr-4 backdrop-blur transition-all duration-300 animate-rise hover:translate-x-1 hover:shadow-md"
+              className="relative flex items-center gap-4 rounded-xl border bg-card p-3 pr-4 transition-[transform,box-shadow] duration-300 animate-rise hover:translate-x-1 hover:shadow-md"
               style={{ animationDelay: `${240 + index * 70}ms` }}
             >
               <span className={`grid size-10 shrink-0 place-items-center rounded-xl ring-1 ring-inset ${tint}`}>
